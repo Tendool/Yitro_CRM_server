@@ -19,7 +19,14 @@ export default defineConfig(({ mode }) => ({
       external: ["next/navigation", "next/router", "next/image"],
     },
   },
-  plugins: [react(), expressPlugin()],
+  plugins: [
+    react({
+      // Fix JSX runtime for production builds
+      jsxImportSource: "react",
+      plugins: [],
+    }),
+    expressPlugin()
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./client"),
@@ -29,6 +36,11 @@ export default defineConfig(({ mode }) => ({
   define: {
     "process.env": {},
     global: "globalThis",
+  },
+  // Ensure proper JSX runtime handling
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "react",
   },
 }));
 

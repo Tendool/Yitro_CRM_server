@@ -32,7 +32,8 @@
     "migrate": "npx prisma migrate dev",
     "migrate:prod": "npx prisma migrate deploy",
     "db:seed": "npx tsx server/db/setup-test-accounts.ts",
-    "db:clear": "npx tsx server/scripts/clear-database.ts"
+    "db:clear": "npx tsx server/scripts/clear-database.ts",
+    "db:test": "npx tsx server/scripts/test-db-persistence.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
@@ -124,3 +125,4 @@
     "vitest": "^3.1.4"
   }
 }
+

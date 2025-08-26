@@ -34,7 +34,7 @@ class EmailService {
       console.log(
         "⚠️ No SMTP configuration found. Using test transporter (emails will not be sent).",
       );
-      return nodemailer.createTransporter({
+      return nodemailer.createTransport({
         host: "smtp.ethereal.email",
         port: 587,
         secure: false,
@@ -50,7 +50,7 @@ class EmailService {
       // Use predefined service configurations
       switch (smtpService) {
         case "gmail":
-          return nodemailer.createTransporter({
+          return nodemailer.createTransport({
             service: "gmail",
             auth: {
               user: smtpUser,
@@ -59,7 +59,7 @@ class EmailService {
           });
 
         case "sendgrid":
-          return nodemailer.createTransporter({
+          return nodemailer.createTransport({
             host: "smtp.sendgrid.net",
             port: 587,
             secure: false,
@@ -70,7 +70,7 @@ class EmailService {
           });
 
         case "mailgun":
-          return nodemailer.createTransporter({
+          return nodemailer.createTransport({
             host: "smtp.mailgun.org",
             port: 587,
             secure: false,
@@ -82,7 +82,7 @@ class EmailService {
 
         case "ses":
         case "aws":
-          return nodemailer.createTransporter({
+          return nodemailer.createTransport({
             host:
               process.env.AWS_SES_HOST || "email-smtp.us-east-1.amazonaws.com",
             port: 587,
@@ -94,7 +94,7 @@ class EmailService {
           });
 
         case "postmark":
-          return nodemailer.createTransporter({
+          return nodemailer.createTransport({
             host: "smtp.postmarkapp.com",
             port: 587,
             secure: false,
@@ -106,7 +106,7 @@ class EmailService {
 
         case "outlook":
         case "hotmail":
-          return nodemailer.createTransporter({
+          return nodemailer.createTransport({
             service: "hotmail",
             auth: {
               user: smtpUser,
@@ -124,7 +124,7 @@ class EmailService {
 
     // Use custom SMTP configuration
     if (smtpHost) {
-      return nodemailer.createTransporter({
+      return nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
         secure: smtpSecure, // true for 465, false for other ports
@@ -141,7 +141,7 @@ class EmailService {
 
     // Fallback to Gmail service if no specific configuration
     console.log("Using Gmail as fallback SMTP service.");
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: smtpUser,
@@ -531,3 +531,4 @@ class EmailService {
 }
 
 export const emailService = new EmailService();
+

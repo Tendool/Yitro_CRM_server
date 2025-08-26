@@ -120,20 +120,38 @@ export const getContact: RequestHandler = async (req, res) => {
 
 export const createContact: RequestHandler = async (req, res) => {
   try {
-    const data: CreateContactRequest = req.body;
+    const data: any = req.body;
+
+    // Handle field mapping from frontend
+    const nameParts = data.name ? data.name.split(' ') : [];
+    const firstName = data.firstName || nameParts[0] || '';
+    const lastName = data.lastName || nameParts.slice(1).join(' ') || '';
+
+    const contactData = {
+      firstName,
+      lastName,
+      title: data.title,
+      associatedAccount: data.associatedAccount,
+      emailAddress: data.emailAddress || data.email,
+      deskPhone: data.deskPhone,
+      mobilePhone: data.mobilePhone || data.phone,
+      city: data.city,
+      state: data.state,
+      country: data.country,
+      timeZone: data.timeZone,
+      source: data.source
+        ? data.source.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      owner: data.owner,
+      status: data.status
+        ? data.status.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      createdBy: "system",
+      updatedBy: "system",
+    };
 
     const contact = await prisma.contact.create({
-      data: {
-        ...data,
-        source: data.source
-          ? data.source.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        status: data.status
-          ? data.status.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        createdBy: "system",
-        updatedBy: "system",
-      } as any,
+      data: contactData as any,
     });
 
     const response: ApiResponse<Contact> = {
@@ -638,24 +656,63 @@ export const getDeal: RequestHandler = async (req, res) => {
 
 export const createDeal: RequestHandler = async (req, res) => {
   try {
-    const data: CreateDealRequest = req.body;
+    const data: any = req.body;
+
+    // Handle date conversion
+    let closingDate: Date | undefined = undefined;
+    if (data.closingDate) {
+      try {
+        if (typeof data.closingDate === 'string') {
+          // Handle different date formats
+          if (data.closingDate.includes('T')) {
+            // Already ISO format
+            closingDate = new Date(data.closingDate);
+          } else {
+            // Convert YYYY-MM-DD to full ISO DateTime
+            closingDate = new Date(data.closingDate + 'T12:00:00.000Z');
+          }
+        } else if (data.closingDate instanceof Date) {
+          closingDate = data.closingDate;
+        }
+
+        // Validate the date is valid
+        if (closingDate && isNaN(closingDate.getTime())) {
+          console.warn('Invalid date provided:', data.closingDate);
+          closingDate = undefined;
+        }
+      } catch (error) {
+        console.error('Date conversion error:', error, 'Original value:', data.closingDate);
+        closingDate = undefined;
+      }
+    }
+
+    const dealData = {
+      dealOwner: data.dealOwner || data.owner,
+      dealName: data.dealName,
+      businessLine: data.businessLine
+        ? data.businessLine.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      associatedAccount: data.associatedAccount,
+      associatedContact: data.associatedContact,
+      closingDate,
+      probability: data.probability ? String(data.probability) : undefined,
+      dealValue: data.dealValue ? String(data.dealValue) : undefined,
+      approvedBy: data.approvedBy,
+      description: data.description,
+      nextStep: data.nextStep,
+      geo: data.geo ? data.geo.replace(/\s+/g, "_").toUpperCase() : undefined,
+      entity: data.entity
+        ? data.entity.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      stage: data.stage
+        ? data.stage.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      createdBy: "system",
+      updatedBy: "system",
+    };
 
     const deal = await prisma.activeDeal.create({
-      data: {
-        ...data,
-        businessLine: data.businessLine
-          ? data.businessLine.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        geo: data.geo ? data.geo.replace(" ", "_").toUpperCase() : undefined,
-        entity: data.entity
-          ? data.entity.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        stage: data.stage
-          ? data.stage.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        createdBy: "system",
-        updatedBy: "system",
-      } as any,
+      data: dealData as any,
     });
 
     const response: ApiResponse<ActiveDeal> = {
@@ -810,23 +867,36 @@ export const getLead: RequestHandler = async (req, res) => {
 
 export const createLead: RequestHandler = async (req, res) => {
   try {
-    const data: CreateLeadRequest = req.body;
+    const data: any = req.body;
+
+    // Handle field mapping from frontend
+    const nameParts = data.name ? data.name.split(' ') : [];
+    const firstName = data.firstName || nameParts[0] || '';
+    const lastName = data.lastName || nameParts.slice(1).join(' ') || '';
+
+    const leadData = {
+      firstName,
+      lastName,
+      company: data.company,
+      title: data.title,
+      phone: data.phone,
+      email: data.email,
+      leadSource: data.leadSource || data.source
+        ? (data.leadSource || data.source).replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      status: data.status
+        ? data.status.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      rating: data.rating
+        ? data.rating.replace(/\s+/g, "_").toUpperCase()
+        : undefined,
+      owner: data.owner,
+      createdBy: "system",
+      updatedBy: "system",
+    };
 
     const lead = await prisma.lead.create({
-      data: {
-        ...data,
-        leadSource: data.leadSource
-          ? data.leadSource.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        status: data.status
-          ? data.status.replace(" ", "_").toUpperCase()
-          : undefined,
-        rating: data.rating
-          ? data.rating.replace(" ", "_").toUpperCase()
-          : undefined,
-        createdBy: "system",
-        updatedBy: "system",
-      } as any,
+      data: leadData as any,
     });
 
     const response: ApiResponse<Lead> = {
@@ -1133,3 +1203,4 @@ export const initializeSampleData = async () => {
   console.log("✅ CRM sample data initialized");
   return;
 };
+
