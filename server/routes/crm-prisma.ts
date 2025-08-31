@@ -1,5 +1,7 @@
 import { RequestHandler } from "express";
 import { prisma } from "../lib/prisma";
+import { BusinessLine, Geography, Entity, DealStage } from "@prisma/client";
+
 import {
   Contact,
   Account,
@@ -310,40 +312,111 @@ export const getAccount: RequestHandler = async (req, res) => {
 
 export const createAccount: RequestHandler = async (req, res) => {
   try {
-    const data: CreateAccountRequest = req.body;
+    const data = req.body;
+
+    // Validate required fields
+    if (!data.accountName || data.accountName.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: "Account name is required",
+      });
+    }
+
+    // Convert and validate enum values
+    const accountRating = data.accountRating ? data.accountRating.replace(/\s+/g, "_").toUpperCase() : "BRONZE";
+    const status = data.status ? data.status.replace(/\s+/g, "_").toUpperCase() : "PROSPECT";
+    const geo = data.geo ? data.geo.replace(/\s+/g, "_").toUpperCase() : "AMERICAS";
+
+    // Validate enum values
+    const validRatings = ["PLATINUM", "GOLD", "SILVER", "BRONZE"];
+    const validStatuses = ["SUSPECT", "PROSPECT", "ACTIVE_DEAL", "DO_NOT_CALL"];
+    const validGeos = ["AMERICAS", "INDIA", "PHILIPPINES", "EMEA", "ANZ"];
+
+    if (!validRatings.includes(accountRating)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid account rating. Must be one of: ${validRatings.join(', ')}`,
+      });
+    }
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+      });
+    }
+
+    if (!validGeos.includes(geo)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid geo. Must be one of: ${validGeos.join(', ')}`,
+      });
+    }
 
     const account = await prisma.account.create({
       data: {
-        ...data,
-        accountRating: data.accountRating
-          ? data.accountRating.replace(/\s+/g, "_").toUpperCase()
-          : undefined,
-        status: data.status
-          ? data.status.replace(" ", "_").toUpperCase()
-          : undefined,
-        geo: data.geo ? data.geo.replace(" ", "_").toUpperCase() : undefined,
+        accountName: data.accountName.trim(),
+        accountRating: accountRating,
+        status: status,
+        geo: geo,
+        industry: data.industry || "",
+        revenue: data.revenue || "",
+        numberOfEmployees: data.numberOfEmployees || "",
+        website: data.website || "",
+        city: data.city || "",
+        state: data.state || "",
+        country: data.country || "",
+        timeZone: data.timeZone || "UTC",
         createdBy: "system",
         updatedBy: "system",
-      } as any,
+      },
     });
+
+    // Map enum values to display strings for response
+    const accountRatingMap: Record<string, string> = {
+      PLATINUM: "Platinum (Must Have)",
+      GOLD: "Gold (High Priority)",
+      SILVER: "Silver (Medium Priority)",
+      BRONZE: "Bronze (Low Priority)",
+    };
+    const statusMap: Record<string, string> = {
+      SUSPECT: "Suspect",
+      PROSPECT: "Prospect",
+      ACTIVE_DEAL: "Active Deal",
+      DO_NOT_CALL: "Do Not Call",
+    };
+    const geoMap: Record<string, string> = {
+      AMERICAS: "Americas",
+      INDIA: "India",
+      PHILIPPINES: "Philippines",
+      EMEA: "EMEA",
+      ANZ: "ANZ",
+    };
 
     const response: ApiResponse<Account> = {
       success: true,
       data: {
         ...account,
         accountRating: account.accountRating
-          ? account.accountRating.replace(/_/g, " ")
+          ? accountRatingMap[account.accountRating] || account.accountRating
           : undefined,
-        status: account.status ? account.status.replace("_", " ") : undefined,
-        geo: account.geo ? account.geo.replace("_", " ") : undefined,
+        status: account.status
+          ? statusMap[account.status] || account.status
+          : undefined,
+        geo: account.geo
+          ? geoMap[account.geo] || account.geo
+          : undefined,
       } as Account,
-      message: "Account created successfully",
+      message: 'Account created successfully',
     };
 
     res.status(201).json(response);
   } catch (error) {
     console.error("Error creating account:", error);
-    res.status(500).json({ success: false, error: "Failed to create account" });
+    res.status(500).json({
+      success: false,
+      error: "Failed to create account",
+    });
   }
 };
 
@@ -654,6 +727,7 @@ export const getDeal: RequestHandler = async (req, res) => {
   }
 };
 
+
 export const createDeal: RequestHandler = async (req, res) => {
   try {
     const data: any = req.body;
@@ -663,19 +737,15 @@ export const createDeal: RequestHandler = async (req, res) => {
     if (data.closingDate) {
       try {
         if (typeof data.closingDate === 'string') {
-          // Handle different date formats
           if (data.closingDate.includes('T')) {
-            // Already ISO format
             closingDate = new Date(data.closingDate);
           } else {
-            // Convert YYYY-MM-DD to full ISO DateTime
             closingDate = new Date(data.closingDate + 'T12:00:00.000Z');
           }
         } else if (data.closingDate instanceof Date) {
           closingDate = data.closingDate;
         }
 
-        // Validate the date is valid
         if (closingDate && isNaN(closingDate.getTime())) {
           console.warn('Invalid date provided:', data.closingDate);
           closingDate = undefined;
@@ -686,35 +756,165 @@ export const createDeal: RequestHandler = async (req, res) => {
       }
     }
 
+    // Handle associated account - create if provided and doesn't exist
+    let accountId: string | null = null;
+    if (data.associatedAccount && data.associatedAccount.trim() !== '') {
+      try {
+        // First check if it's an ID (if it looks like a UUID or database ID)
+        if (data.associatedAccount.length > 10) {
+          const existingAccount = await prisma.account.findUnique({
+            where: { id: data.associatedAccount },
+          });
+          if (existingAccount) {
+            accountId = data.associatedAccount;
+          }
+        }
+
+        // If not found by ID, try to find by name
+        if (!accountId) {
+          let account = await prisma.account.findFirst({
+            where: { 
+              accountName: { 
+                contains: data.associatedAccount.trim()
+              }
+            },
+          });
+
+          // If account doesn't exist, create it
+          if (!account) {
+            account = await prisma.account.create({
+              data: {
+                accountName: data.associatedAccount.trim(),
+                accountRating: "BRONZE",
+                status: "PROSPECT", 
+                geo: "AMERICAS",
+                industry: "",
+                revenue: "",
+                numberOfEmployees: "",
+                website: "",
+                city: "",
+                state: "",
+                country: "",
+                timeZone: "UTC",
+                createdBy: "system",
+                updatedBy: "system",
+              },
+            });
+          }
+
+          accountId = account.id;
+        }
+      } catch (error) {
+        console.error('Error handling associated account:', error);
+        return res.status(400).json({ 
+          success: false, 
+          error: "Failed to create or find associated account" 
+        });
+      }
+    }
+
+    // Handle associated contact - create if provided and doesn't exist
+    let contactId: string | null = null;
+    if (data.associatedContact && data.associatedContact.trim() !== '') {
+      try {
+        // First check if it's an ID
+        if (data.associatedContact.length > 10) {
+          const existingContact = await prisma.contact.findUnique({
+            where: { id: data.associatedContact },
+          });
+          if (existingContact) {
+            contactId = data.associatedContact;
+          }
+        }
+
+        // If not found by ID, try to find by email or name
+        if (!contactId) {
+          // Assume it's an email or name
+          const searchTerm = data.associatedContact.trim();
+          let contact = await prisma.contact.findFirst({
+            where: {
+              OR: [
+                { emailAddress: { contains: searchTerm } },
+                { firstName: { contains: searchTerm.split(' ')[0] || '' } }
+              ]
+            },
+          });
+
+          // If contact doesn't exist, create it
+          if (!contact) {
+            const nameParts = searchTerm.includes('@') 
+              ? [searchTerm.split('@')[0], ''] 
+              : searchTerm.split(' ');
+            
+            contact = await prisma.contact.create({
+              data: {
+                firstName: nameParts[0] || 'Unknown',
+                lastName: nameParts.slice(1).join(' ') || '',
+                emailAddress: searchTerm.includes('@') ? searchTerm : '',
+                title: '',
+                associatedAccount: accountId,
+                deskPhone: '',
+                mobilePhone: '',
+                city: '',
+                state: '',
+                country: '',
+                timeZone: 'UTC',
+                source: 'DATA_RESEARCH',
+                owner: data.owner || 'system',
+                status: 'SUSPECT',
+                createdBy: 'system',
+                updatedBy: 'system',
+              },
+            });
+          }
+
+          contactId = contact.id;
+        }
+      } catch (error) {
+        console.error('Error handling associated contact:', error);
+        return res.status(400).json({ 
+          success: false, 
+          error: "Failed to create or find associated contact" 
+        });
+      }
+    }
+
+    // Prepare the dealData for creation - using exact field names from schema
     const dealData = {
-      dealOwner: data.dealOwner || data.owner,
+      dealOwner: data.dealOwner || data.owner || 'system',
       dealName: data.dealName,
       businessLine: data.businessLine
-        ? data.businessLine.replace(/\s+/g, "_").toUpperCase()
-        : undefined,
-      associatedAccount: data.associatedAccount,
-      associatedContact: data.associatedContact,
+        ? data.businessLine.replace(/\s+/g, "_").toUpperCase() as BusinessLine
+        : "RCM",
+      associatedAccount: accountId, // This matches your schema field name
+      associatedContact: contactId, // This matches your schema field name
       closingDate,
-      probability: data.probability ? String(data.probability) : undefined,
-      dealValue: data.dealValue ? String(data.dealValue) : undefined,
-      approvedBy: data.approvedBy,
-      description: data.description,
-      nextStep: data.nextStep,
-      geo: data.geo ? data.geo.replace(/\s+/g, "_").toUpperCase() : undefined,
+      probability: data.probability ? String(data.probability) : "0",
+      dealValue: data.dealValue ? String(data.dealValue) : "0",
+      approvedBy: data.approvedBy || "",
+      description: data.description || "",
+      nextStep: data.nextStep || "",
+      geo: data.geo ? data.geo.replace(/\s+/g, "_").toUpperCase() as Geography : "AMERICAS",
       entity: data.entity
-        ? data.entity.replace(/\s+/g, "_").toUpperCase()
-        : undefined,
+        ? data.entity.replace(/\s+/g, "_").toUpperCase() as Entity
+        : "YITRO_GLOBAL",
       stage: data.stage
-        ? data.stage.replace(/\s+/g, "_").toUpperCase()
-        : undefined,
+        ? data.stage.replace(/\s+/g, "_").toUpperCase() as DealStage
+        : "OPPORTUNITY_IDENTIFIED",
       createdBy: "system",
       updatedBy: "system",
     };
 
+    // Create the deal in the database
     const deal = await prisma.activeDeal.create({
-      data: dealData as any,
+      data: dealData,
+      include: {
+        account: true,
+        contact: true,
+      },
     });
 
+    // Prepare the response
     const response: ApiResponse<ActiveDeal> = {
       success: true,
       data: {
