@@ -1,431 +1,332 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
-import { api } from "../services/api";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '@/services/demoApi'; // Add this import
 
-// Types
-interface Lead {
-  id: string;
-  firstName: string;
-  lastName: string;
-  company: string;
-  title?: string;
-  phone?: string;
-  email?: string;
-  leadSource?: string;
-  status?: string;
-  rating?: string;
-  owner?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
-}
-
-interface Account {
-  id: string;
-  accountName: string;
-  accountRating?: string;
-  accountOwner?: string;
-  status?: string;
+export interface Account {
+  id: number;
+  name?: string;
+  accountName?: string; // Support both field names
   industry?: string;
+  type?: string;
   revenue?: string;
-  numberOfEmployees?: string;
-  addressLine1?: string;
-  addressLine2?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  zipPostCode?: string;
-  timeZone?: string;
-  boardNumber?: string;
+  employees?: string;
+  location?: string;
+  phone?: string;
   website?: string;
-  geo?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
+  owner?: string;
+  rating?: string;
+  lastActivity?: string;
+  activeDeals?: number;
+  contacts?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
-interface Contact {
-  id: string;
+export interface Contact {
+  id: number;
   firstName: string;
   lastName: string;
-  title?: string;
-  associatedAccount?: string;
-  emailAddress?: string;
-  deskPhone?: string;
-  mobilePhone?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  timeZone?: string;
-  source?: "Data Research" | "Referral" | "Event";
-  owner?: string;
-  ownerId?: string;
-  status?: "Suspect" | "Prospect" | "Active Deal" | "Do Not Call";
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  company: string;
+  jobTitle: string;
+  status: string;
+  rating: string;
+  leadSource: string;
+  assignedTo: string;
+  lastContact: string;
+  nextFollowUp: string;
+  tags: string[];
+  notes: string;
 }
 
-interface ActiveDeal {
-  id: string;
-  dealName: string;
-  dealOwner?: string;
-  businessLine?: string;
-  associatedAccount?: string;
-  associatedContact?: string;
-  closingDate?: string;
-  probability?: string;
-  dealValue?: string;
-  approvedBy?: string;
-  description?: string;
-  nextStep?: string;
-  geo?: string;
-  entity?: string;
-  stage?: string;
-  owner?: string;
-  ownerId?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
+export interface Deal {
+  id: number;
+  name: string;
+  company: string;
+  value: string;
+  stage: string;
+  probability: number;
+  closeDate: string;
+  owner: string;
+  type: string;
+  source: string;
+  description: string;
+}
+
+export interface Activity {
+  id: number;
+  type: string;
+  subject: string;
+  relatedTo: string;
+  assignedTo: string;
+  dueDate: string;
+  status: string;
+  priority: string;
+  description: string;
+}
+
+export interface Lead {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  company: string;
+  email: string;
+  phone: string;
+  status: string;
+  rating: string;
+  source: string;
+  assignedTo: string;
+  createdDate: string;
+  lastContact: string;
+  nextFollowUp: string;
+  estimatedValue: string;
 }
 
 interface CRMContextType {
-  // Data
-  leads: Lead[];
+  // Accounts
   accounts: Account[];
+  addAccount: (account: Omit<Account, 'id'>) => Promise<void>;
+  updateAccount: (id: number, account: Partial<Account>) => void;
+  deleteAccount: (id: number) => void;
+
+  // Contacts
   contacts: Contact[];
-  deals: ActiveDeal[];
-  loading: boolean;
-  error: string | null;
+  addContact: (contact: Omit<Contact, 'id'>) => void;
+  updateContact: (id: number, contact: Partial<Contact>) => void;
+  deleteContact: (id: number) => void;
 
-  // Lead operations
-  addLead: (lead: Omit<Lead, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => Promise<void>;
-  updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
-  deleteLead: (id: string) => Promise<void>;
+  // Deals
+  deals: Deal[];
+  addDeal: (deal: Omit<Deal, 'id'>) => void;
+  updateDeal: (id: number, deal: Partial<Deal>) => void;
+  deleteDeal: (id: number) => void;
 
-  // Account operations
-  addAccount: (account: Omit<Account, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => Promise<void>;
-  updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
-  deleteAccount: (id: string) => Promise<void>;
+  // Activities
+  activities: Activity[];
+  addActivity: (activity: Omit<Activity, 'id'>) => void;
+  updateActivity: (id: number, activity: Partial<Activity>) => void;
+  deleteActivity: (id: number) => void;
 
-  // Contact operations
-  addContact: (contact: Omit<Contact, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => Promise<void>;
-  updateContact: (id: string, updates: Partial<Contact>) => Promise<void>;
-  deleteContact: (id: string) => Promise<void>;
-
-  // Deal operations
-  addDeal: (deal: Omit<ActiveDeal, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => Promise<void>;
-  updateDeal: (id: string, updates: Partial<ActiveDeal>) => Promise<void>;
-  deleteDeal: (id: string) => Promise<void>;
-
-  // Refresh operations
-  refreshData: () => Promise<void>;
+  // Leads
+  leads: Lead[];
+  addLead: (lead: Omit<Lead, 'id'>) => void;
+  updateLead: (id: number, lead: Partial<Lead>) => void;
+  deleteLead: (id: number) => void;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
 
-export function CRMProvider({ children }: { children: ReactNode }) {
-  const initTime = new Date().toISOString();
-  console.log("🏗️ CRMProvider initializing at:", initTime);
-
-  // Track provider recreations
-  (window as any).crmProviderInitTime = initTime;
-
-  // Initialize state
-  const [leads, setLeads] = useState<Lead[]>([]);
+export function CRMProvider({ children }: { children: React.ReactNode }) {
+  // Initialize all arrays as empty - no sample data
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [deals, setDeals] = useState<ActiveDeal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
 
-  // Fetch all data from backend
-  const fetchData = async () => {
+  // Account functions
+  const addAccount = async (accountData: Omit<Account, 'id'>) => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      console.log("🔄 Fetching data from backend...");
-      
-      const [leadsRes, accountsRes, contactsRes, dealsRes] = await Promise.all([
-        api.leads.getAll({ limit: 100 }),
-        api.accounts.getAll({ limit: 100 }),
-        api.contacts.getAll({ limit: 100 }),
-        api.deals.getAll({ limit: 100 })
-      ]);
-
-      console.log("✅ Data fetched successfully:", {
-        leads: leadsRes.data?.length || 0,
-        accounts: accountsRes.data?.length || 0,
-        contacts: contactsRes.data?.length || 0,
-        deals: dealsRes.data?.length || 0
-      });
-
-      setLeads(leadsRes.data || []);
-      setAccounts(accountsRes.data || []);
-      setContacts(contactsRes.data || []);
-      setDeals(dealsRes.data || []);
-    } catch (err) {
-      console.error("❌ Error fetching data:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Lead operations
-  const addLead = async (leadData: Omit<Lead, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => {
-    try {
-      setError(null);
-      const response = await api.leads.create(leadData);
-      if (response.success && response.data) {
-        setLeads(prev => [...prev, response.data]);
-        console.log("Lead added:", response.data);
+      // Validate that accountName is provided
+      if (!accountData.accountName && !accountData.name) {
+        throw new Error('Account name is required');
       }
-    } catch (err) {
-      console.error("Error adding lead:", err);
-      setError(err instanceof Error ? err.message : "Failed to add lead");
-      throw err;
-    }
-  };
 
-  const updateLead = async (id: string, updates: Partial<Lead>) => {
-    try {
-      setError(null);
-      const response = await api.leads.update(id, updates);
-      if (response.success && response.data) {
-        setLeads(prev => prev.map(lead => lead.id === id ? response.data : lead));
-        console.log("Lead updated:", id, updates);
+      // Ensure all required fields have default values
+      const normalizedAccountData = {
+        accountName: accountData.accountName || accountData.name || '',
+        name: accountData.name || accountData.accountName || '',
+        industry: accountData.industry || 'Technology',
+        type: accountData.type || 'Customer',
+        revenue: accountData.revenue || '$0',
+        employees: accountData.employees || '1-10',
+        location: accountData.location || '',
+        phone: accountData.phone || '',
+        website: accountData.website || '',
+        owner: accountData.owner || 'Current User',
+        rating: accountData.rating || 'Cold',
+        lastActivity: accountData.lastActivity || 'Just now',
+        activeDeals: accountData.activeDeals || 0,
+        contacts: accountData.contacts || 0,
+        createdBy: accountData.createdBy || 'current-user',
+        updatedBy: accountData.updatedBy || 'current-user'
+      };
+
+      // Try to use the API if available
+      try {
+        const response = await api.accounts.create(normalizedAccountData);
+        if (response.success && response.data) {
+          const newAccount = {
+            ...normalizedAccountData,
+            id: typeof response.data.id === 'string' ? parseInt(response.data.id) : (response.data.id || Date.now()),
+          };
+          setAccounts(prev => [...prev, newAccount]);
+          return;
+        }
+      } catch (apiError) {
+        console.warn('API not available, using local storage:', apiError);
       }
-    } catch (err) {
-      console.error("Error updating lead:", err);
-      setError(err instanceof Error ? err.message : "Failed to update lead");
-      throw err;
+
+      // Fallback to local storage if API fails
+      const newAccount = {
+        ...normalizedAccountData,
+        id: Date.now(),
+      };
+      setAccounts(prev => [...prev, newAccount]);
+
+    } catch (error) {
+      console.error('Error adding account:', error);
+      throw error;
     }
   };
 
-  const deleteLead = async (id: string) => {
-    try {
-      setError(null);
-      await api.leads.delete(id);
-      setLeads(prev => prev.filter(lead => lead.id !== id));
-      console.log("Lead deleted:", id);
-    } catch (err) {
-      console.error("Error deleting lead:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete lead");
-      throw err;
-    }
+  const updateAccount = (id: number, accountData: Partial<Account>) => {
+    setAccounts(prev => prev.map(account => 
+      account.id === id 
+        ? { 
+            ...account, 
+            ...accountData,
+            // Ensure both name fields are updated and have fallbacks
+            name: accountData.name || accountData.accountName || account.name || account.accountName || '',
+            accountName: accountData.accountName || accountData.name || account.accountName || account.name || '',
+            // Ensure type has a fallback
+            type: accountData.type || account.type || 'Customer',
+            // Ensure rating has a fallback
+            rating: accountData.rating || account.rating || 'Cold',
+            // Ensure other fields have fallbacks
+            industry: accountData.industry || account.industry || 'Technology',
+            revenue: accountData.revenue || account.revenue || '$0',
+            employees: accountData.employees || account.employees || '1-10',
+            owner: accountData.owner || account.owner || 'Current User',
+            lastActivity: accountData.lastActivity || account.lastActivity || 'Just now',
+            activeDeals: accountData.activeDeals ?? account.activeDeals ?? 0,
+            contacts: accountData.contacts ?? account.contacts ?? 0,
+          } 
+        : account
+    ));
   };
 
-  // Account operations
-  const addAccount = async (accountData: Omit<Account, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => {
-    try {
-      setError(null);
-      const response = await api.accounts.create(accountData);
-      if (response.success && response.data) {
-        setAccounts(prev => [...prev, response.data]);
-        console.log("Account added:", response.data);
-      }
-    } catch (err) {
-      console.error("Error adding account:", err);
-      setError(err instanceof Error ? err.message : "Failed to add account");
-      throw err;
-    }
+  const deleteAccount = (id: number) => {
+    setAccounts(prev => prev.filter(account => account.id !== id));
   };
 
-  const updateAccount = async (id: string, updates: Partial<Account>) => {
-    try {
-      setError(null);
-      const response = await api.accounts.update(id, updates);
-      if (response.success && response.data) {
-        setAccounts(prev => prev.map(account => account.id === id ? response.data : account));
-        console.log("Account updated:", id, updates);
-      }
-    } catch (err) {
-      console.error("Error updating account:", err);
-      setError(err instanceof Error ? err.message : "Failed to update account");
-      throw err;
-    }
-  };
-
-  const deleteAccount = async (id: string) => {
-    try {
-      setError(null);
-      await api.accounts.delete(id);
-      setAccounts(prev => prev.filter(account => account.id !== id));
-      console.log("Account deleted:", id);
-    } catch (err) {
-      console.error("Error deleting account:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete account");
-      throw err;
-    }
-  };
-
-  // Contact operations
-  const addContact = async (contactData: Omit<Contact, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => {
-    try {
-      setError(null);
-      const response = await api.contacts.create(contactData);
-      if (response.success && response.data) {
-        setContacts(prev => [...prev, response.data]);
-        console.log("Contact added:", response.data);
-      }
-    } catch (err) {
-      console.error("Error adding contact:", err);
-      setError(err instanceof Error ? err.message : "Failed to add contact");
-      throw err;
-    }
-  };
-
-  const updateContact = async (id: string, updates: Partial<Contact>) => {
-    try {
-      setError(null);
-      const response = await api.contacts.update(id, updates);
-      if (response.success && response.data) {
-        setContacts(prev => prev.map(contact => contact.id === id ? response.data : contact));
-        console.log("Contact updated:", id, updates);
-      }
-    } catch (err) {
-      console.error("Error updating contact:", err);
-      setError(err instanceof Error ? err.message : "Failed to update contact");
-      throw err;
-    }
-  };
-
-  const deleteContact = async (id: string) => {
-    try {
-      setError(null);
-      await api.contacts.delete(id);
-      setContacts(prev => prev.filter(contact => contact.id !== id));
-      console.log("Contact deleted:", id);
-    } catch (err) {
-      console.error("Error deleting contact:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete contact");
-      throw err;
-    }
-  };
-
-  // Deal operations
-  const addDeal = async (dealData: Omit<ActiveDeal, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">) => {
-    try {
-      setError(null);
-      const response = await api.deals.create(dealData);
-      if (response.success && response.data) {
-        setDeals(prev => [...prev, response.data]);
-        console.log("Deal added:", response.data);
-      }
-    } catch (err) {
-      console.error("Error adding deal:", err);
-      setError(err instanceof Error ? err.message : "Failed to add deal");
-      throw err;
-    }
-  };
-
-  const updateDeal = async (id: string, updates: Partial<ActiveDeal>) => {
-    try {
-      setError(null);
-      const response = await api.deals.update(id, updates);
-      if (response.success && response.data) {
-        setDeals(prev => prev.map(deal => deal.id === id ? response.data : deal));
-        console.log("Deal updated:", id, updates);
-      }
-    } catch (err) {
-      console.error("Error updating deal:", err);
-      setError(err instanceof Error ? err.message : "Failed to update deal");
-      throw err;
-    }
-  };
-
-  const deleteDeal = async (id: string) => {
-    try {
-      setError(null);
-      await api.deals.delete(id);
-      setDeals(prev => prev.filter(deal => deal.id !== id));
-      console.log("Deal deleted:", id);
-    } catch (err) {
-      console.error("Error deleting deal:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete deal");
-      throw err;
-    }
-  };
-
-  // Refresh all data
-  const refreshData = async () => {
-    await fetchData();
-  };
-
-  // Debug function to check current state (useful for debugging)
-  useEffect(() => {
-    (window as any).debugCRM = () => {
-      console.log("🔍 Current CRM state:");
-      console.log("Leads:", leads.length);
-      console.log("Accounts:", accounts.length);
-      console.log("Contacts:", contacts.length);
-      console.log("Deals:", deals.length);
-      console.log("Loading:", loading);
-      console.log("Error:", error);
-
-      // Show detailed contacts data
-      console.log(
-        "📋 Current contacts details:",
-        contacts.map((c) => `${c.firstName} ${c.lastName} (${c.id})`),
-      );
+  // Contact functions
+  const addContact = (contactData: Omit<Contact, 'id'>) => {
+    const newContact: Contact = {
+      ...contactData,
+      id: Date.now(),
     };
-
-    // Add a function to refresh data manually
-    (window as any).refreshCRMData = () => {
-      console.log("🔄 Manually refreshing CRM data...");
-      fetchData();
-    };
-  }, [leads, accounts, contacts, deals, loading, error]);
-
-  const value: CRMContextType = {
-    leads,
-    accounts,
-    contacts,
-    deals,
-    loading,
-    error,
-    addLead,
-    updateLead,
-    deleteLead,
-    addAccount,
-    updateAccount,
-    deleteAccount,
-    addContact,
-    updateContact,
-    deleteContact,
-    addDeal,
-    updateDeal,
-    deleteDeal,
-    refreshData,
+    setContacts(prev => [...prev, newContact]);
   };
 
-  return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>;
+  const updateContact = (id: number, contactData: Partial<Contact>) => {
+    setContacts(prev => prev.map(contact => 
+      contact.id === id ? { ...contact, ...contactData } : contact
+    ));
+  };
+
+  const deleteContact = (id: number) => {
+    setContacts(prev => prev.filter(contact => contact.id !== id));
+  };
+
+  // Deal functions
+  const addDeal = (dealData: Omit<Deal, 'id'>) => {
+    const newDeal: Deal = {
+      ...dealData,
+      id: Date.now(),
+    };
+    setDeals(prev => [...prev, newDeal]);
+  };
+
+  const updateDeal = (id: number, dealData: Partial<Deal>) => {
+    setDeals(prev => prev.map(deal => 
+      deal.id === id ? { ...deal, ...dealData } : deal
+    ));
+  };
+
+  const deleteDeal = (id: number) => {
+    setDeals(prev => prev.filter(deal => deal.id !== id));
+  };
+
+  // Activity functions
+  const addActivity = (activityData: Omit<Activity, 'id'>) => {
+    const newActivity: Activity = {
+      ...activityData,
+      id: Date.now(),
+    };
+    setActivities(prev => [...prev, newActivity]);
+  };
+
+  const updateActivity = (id: number, activityData: Partial<Activity>) => {
+    setActivities(prev => prev.map(activity => 
+      activity.id === id ? { ...activity, ...activityData } : activity
+    ));
+  };
+
+  const deleteActivity = (id: number) => {
+    setActivities(prev => prev.filter(activity => activity.id !== id));
+  };
+
+  // Lead functions
+  const addLead = (leadData: Omit<Lead, 'id'>) => {
+    const newLead: Lead = {
+      ...leadData,
+      id: Date.now(),
+    };
+    setLeads(prev => [...prev, newLead]);
+  };
+
+  const updateLead = (id: number, leadData: Partial<Lead>) => {
+    setLeads(prev => prev.map(lead => 
+      lead.id === id ? { ...lead, ...leadData } : lead
+    ));
+  };
+
+  const deleteLead = (id: number) => {
+    setLeads(prev => prev.filter(lead => lead.id !== id));
+  };
+
+  return (
+    <CRMContext.Provider
+      value={{
+        // Accounts
+        accounts,
+        addAccount,
+        updateAccount,
+        deleteAccount,
+        // Contacts
+        contacts,
+        addContact,
+        updateContact,
+        deleteContact,
+        // Deals
+        deals,
+        addDeal,
+        updateDeal,
+        deleteDeal,
+        // Activities
+        activities,
+        addActivity,
+        updateActivity,
+        deleteActivity,
+        // Leads
+        leads,
+        addLead,
+        updateLead,
+        deleteLead,
+      }}
+    >
+      {children}
+    </CRMContext.Provider>
+  );
 }
 
 export function useCRM() {
   const context = useContext(CRMContext);
   if (context === undefined) {
-    throw new Error("useCRM must be used within a CRMProvider");
+    throw new Error('useCRM must be used within a CRMProvider');
   }
   return context;
 }
-
-// Export types for use in components
-export type { Lead, Account, Contact, ActiveDeal };
-

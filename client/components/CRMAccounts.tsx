@@ -77,9 +77,7 @@ export function CRMAccounts() {
     };
   }, []);
 
-  // Accounts data comes from CRM context
-
-  const handleSaveAccount = () => {
+  const handleSaveAccount = async () => {
     console.log("Saving account:", formData);
 
     if (!formData.name || !formData.industry) {
@@ -94,10 +92,11 @@ export function CRMAccounts() {
         updateAccount(editingAccount.id, formData);
         alert("Account updated successfully!");
       } else {
-        // Create new account
+        // Create new account with proper field mapping
         const newAccountData = {
           name: formData.name || "",
-          industry: formData.industry || "",
+          accountName: formData.name || "",
+          industry: formData.industry || "Technology",
           type: formData.type || "Customer",
           revenue: formData.revenue || "$0",
           employees: formData.employees || "1-10",
@@ -111,7 +110,7 @@ export function CRMAccounts() {
           contacts: 0,
         };
         console.log("Creating new account:", newAccountData);
-        addAccount(newAccountData);
+        await addAccount(newAccountData);
         alert("Account created successfully!");
       }
 
@@ -146,8 +145,10 @@ export function CRMAccounts() {
     setShowNewAccountDialog(false);
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
+  // Safe helper functions with null checks
+  const getTypeColor = (type?: string) => {
+    const safeType = (type || "").toLowerCase();
+    switch (safeType) {
       case "customer":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case "prospect":
@@ -159,8 +160,9 @@ export function CRMAccounts() {
     }
   };
 
-  const getRatingColor = (rating: string) => {
-    switch (rating.toLowerCase()) {
+  const getRatingColor = (rating?: string) => {
+    const safeRating = (rating || "").toLowerCase();
+    switch (safeRating) {
       case "hot":
         return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       case "warm":
@@ -180,13 +182,18 @@ export function CRMAccounts() {
     "Manufacturing",
     "Healthcare",
     "Education",
+    "Consulting",
+    "Finance",
+    "Retail",
+    "Other",
   ];
   const ratings = ["Hot", "Warm", "Cold"];
   const employeeSizes = ["1-10", "10-50", "50-100", "100-500", "500+", "1000+"];
 
   const filteredAccounts = accounts.filter((account) => {
+    const accountType = (account.type || "").toLowerCase();
     const matchesFilter =
-      filterType === "all" || account.type.toLowerCase() === filterType;
+      filterType === "all" || accountType === filterType;
 
     return matchesFilter;
   });
@@ -263,7 +270,7 @@ export function CRMAccounts() {
               <div className="space-y-2">
                 <Label htmlFor="type">Type</Label>
                 <Select
-                  value={formData.type || ""}
+                  value={formData.type || "Customer"}
                   onValueChange={(value) =>
                     setFormData({ ...formData, type: value })
                   }
@@ -420,7 +427,7 @@ export function CRMAccounts() {
                   Customers
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {accounts.filter((a) => a.type === "Customer").length}
+                  {accounts.filter((a) => (a.type || "").toLowerCase() === "customer").length}
                 </p>
               </div>
               <Users className="h-8 w-8 text-green-600" />
@@ -436,7 +443,7 @@ export function CRMAccounts() {
                   Prospects
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {accounts.filter((a) => a.type === "Prospect").length}
+                  {accounts.filter((a) => (a.type || "").toLowerCase() === "prospect").length}
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-yellow-600" />
@@ -452,7 +459,7 @@ export function CRMAccounts() {
                   Partners
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {accounts.filter((a) => a.type === "Partner").length}
+                  {accounts.filter((a) => (a.type || "").toLowerCase() === "partner").length}
                 </p>
               </div>
               <Users className="h-8 w-8 text-purple-600" />
@@ -515,45 +522,50 @@ export function CRMAccounts() {
                   <TableCell>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100">
-                        {account.name}
+                        {account.name || account.accountName || 'Unnamed Account'}
                       </div>
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <Globe className="h-3 w-3 mr-1" />
-                        {account.website}
-                      </div>
+                      {account.website && (
+                        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                          <Globe className="h-3 w-3 mr-1" />
+                          {account.website}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell>{account.industry}</TableCell>
+                  <TableCell>{account.industry || 'N/A'}</TableCell>
                   <TableCell>
                     <Badge className={getTypeColor(account.type)}>
-                      {account.type}
+                      {account.type || 'Customer'}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">
-                    {account.revenue}
+                    {account.revenue || '$0'}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center text-sm">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {account.location}
-                    </div>
+                    {account.location && (
+                      <div className="flex items-center text-sm">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {account.location}
+                      </div>
+                    )}
+                    {!account.location && <span className="text-gray-400">-</span>}
                   </TableCell>
-                  <TableCell>{account.owner}</TableCell>
+                  <TableCell>{account.owner || 'Unassigned'}</TableCell>
                   <TableCell>
                     <Badge className={getRatingColor(account.rating)}>
-                      {account.rating}
+                      {account.rating || 'Cold'}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div>{account.contacts} contacts</div>
+                      <div>{account.contacts || 0} contacts</div>
                       <div className="text-gray-500 dark:text-gray-400">
-                        {account.activeDeals} deals
+                        {account.activeDeals || 0} deals
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-gray-500 dark:text-gray-400">
-                    {account.lastActivity}
+                    {account.lastActivity || 'Never'}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
@@ -561,10 +573,7 @@ export function CRMAccounts() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          console.log(
-                            "Edit button clicked for account:",
-                            account,
-                          );
+                          console.log("Edit button clicked for account:", account);
                           handleEditAccount(account);
                         }}
                       >
@@ -575,10 +584,7 @@ export function CRMAccounts() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          console.log(
-                            "Delete button clicked for account:",
-                            account.id,
-                          );
+                          console.log("Delete button clicked for account:", account.id);
                           handleDeleteAccount(account.id);
                         }}
                         className="text-red-600"
@@ -590,6 +596,28 @@ export function CRMAccounts() {
                   </TableCell>
                 </TableRow>
               ))}
+              {filteredAccounts.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <Building2 className="h-12 w-12 text-gray-400" />
+                      <p className="text-gray-500 dark:text-gray-400">
+                        No accounts found
+                      </p>
+                      <Button
+                        onClick={() => {
+                          resetForm();
+                          setShowNewAccountDialog(true);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Account
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
