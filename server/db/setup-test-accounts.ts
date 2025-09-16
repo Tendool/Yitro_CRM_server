@@ -10,7 +10,7 @@ export async function setupTestAccounts() {
     if (!databaseUrl || !databaseUrl.startsWith("file:")) {
       console.log("❌ SQLite database not configured");
       console.log("Please set DATABASE_URL to a valid SQLite file path");
-      process.exit(1);
+      throw new Error("DATABASE_URL not configured for SQLite");
     }
 
     console.log("🔐 Creating test accounts in SQLite database...");
@@ -61,8 +61,9 @@ export async function setupTestAccounts() {
   } catch (error) {
     console.error("❌ Failed to setup test accounts:", error);
     console.error("Make sure the database is migrated: npm run migrate");
-    process.exit(1);
+    throw error;
   }
 }
 
-setupTestAccounts();
+// Remove auto-execution to prevent issues when imported
+// setupTestAccounts();

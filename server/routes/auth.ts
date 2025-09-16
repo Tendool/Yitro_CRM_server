@@ -102,6 +102,8 @@ router.post("/signin", async (req, res) => {
       });
     }
 
+    console.log('🔐 Signin attempt for:', email);
+
     const result = await authService.signIn({ email, password });
 
     // Create session record if tables exist
@@ -109,18 +111,19 @@ router.post("/signin", async (req, res) => {
       await prisma.authSession.create({
         data: {
           userId: result.user.id,
-          token: result.token,
+          tokenHash: result.token,
           ipAddress: req.ip || 'unknown',
           userAgent: req.headers['user-agent'] || 'unknown',
           isActive: true,
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         }
       });
+      console.log('✅ Session created for user:', result.user.email);
     } catch (sessionError) {
-      console.log('Session creation failed (non-critical):', sessionError.message);
+      console.log('ℹ️ Session creation skipped (non-critical):', sessionError.message);
     }
 
-    // Send login notification email
+    // Send login notification email - skip if email service fails
     try {
       const loginDetails = {
         ip: req.ip || req.connection.remoteAddress,
@@ -132,10 +135,12 @@ router.post("/signin", async (req, res) => {
         result.user.displayName,
         loginDetails,
       );
+      console.log('📧 Login notification sent');
     } catch (emailError) {
-      console.error("Failed to send login notification:", emailError);
-      // Don't fail the login if email fails
+      console.log('ℹ️ Login notification skipped (email service unavailable)');
     }
+
+    console.log('✅ Signin successful for:', email);
 
     res.json({
       success: true,
@@ -146,7 +151,7 @@ router.post("/signin", async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error("Signin error:", error);
+    console.error("❌ Signin error:", error);
     res.status(401).json({
       success: false,
       error: error.message || "Invalid credentials",

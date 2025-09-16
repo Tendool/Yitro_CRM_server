@@ -35,6 +35,7 @@
     "db:clear": "npx tsx server/scripts/clear-database.ts"
   },
   "dependencies": {
+    "@esbuild/linux-x64": "^0.25.9",
     "@neondatabase/serverless": "^1.0.1",
     "@prisma/client": "^6.15.0",
     "@types/bcrypt": "^6.0.0",
