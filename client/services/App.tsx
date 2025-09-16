@@ -10,12 +10,12 @@ import { RealAuthProvider } from "@/components/RealAuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { CRMProvider } from "@/contexts/CRMContext";
 import { useClearLocalStorage } from "@/hooks/useClearLocalStorage";
-import CompanyLogin from "./pages/CompanyLogin";
-import Dashboard from "./pages/Dashboard";
-import VerifyEmail from "./pages/VerifyEmail";
-import ResetPassword from "./pages/ResetPassword";
-import APITest from "./pages/APITest";
-import NotFound from "./pages/NotFound";
+import CompanyLogin from "../pages/CompanyLogin";
+import Dashboard from "../pages/Dashboard";
+import VerifyEmail from "../pages/VerifyEmail";
+import ResetPassword from "../pages/ResetPassword";
+import APITest from "../pages/APITest";
+import NotFound from "../pages/NotFound";
 
 const queryClient = new QueryClient();
 

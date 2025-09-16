@@ -53,6 +53,8 @@ Write-Host "  Frontend: http://localhost:8080" -ForegroundColor White
 Write-Host "  API: http://localhost:3001" -ForegroundColor White
 Write-Host "  Database: SQLite (./dev.db)" -ForegroundColor White
 Write-Host ""
+Write-Host "💡 Alternative: You can also use 'npm start dev' from now on" -ForegroundColor Yellow
+Write-Host ""
 Write-Host "Test accounts:" -ForegroundColor Cyan
 Write-Host "  Admin: admin@yitro.com / admin123" -ForegroundColor White
 Write-Host "  User: user@yitro.com / admin123" -ForegroundColor White

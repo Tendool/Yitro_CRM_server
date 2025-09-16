@@ -1,3 +1,4 @@
+/// <reference types="../types/express" />
 import express from "express";
 import { authService } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";
@@ -372,8 +373,7 @@ router.post("/send-test-email", requireAdmin, async (req, res) => {
     }
 
     await emailService.sendTestEmail(
-      recipientEmail,
-      recipientName || "Test User",
+      recipientEmail
     );
 
     res.json({

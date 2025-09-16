@@ -1,3 +1,4 @@
+/// <reference types="../types/express" />
 import express from "express";
 import { authService, User } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";

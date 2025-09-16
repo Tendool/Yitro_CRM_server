@@ -4,8 +4,56 @@ import {
   ApiResponse, PaginatedResponse
 } from '@shared/models';
 
-// Mock data for demo
-const mockContacts: Contact[] = [
+// LocalStorage keys for persistence
+const STORAGE_KEYS = {
+  CONTACTS: 'yitro-crm-contacts',
+  ACCOUNTS: 'yitro-crm-accounts', 
+  DEALS: 'yitro-crm-deals',
+  LEADS: 'yitro-crm-leads',
+  ACTIVITIES: 'yitro-crm-activities',
+  USER_PROFILE: 'yitro-crm-user-profile'
+};
+
+// Helper functions for localStorage persistence
+const loadFromStorage = <T>(key: string, defaultValue: T): T => {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Convert date strings back to Date objects if needed
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => ({
+          ...item,
+          createdAt: item.createdAt ? new Date(item.createdAt) : item.createdAt,
+          updatedAt: item.updatedAt ? new Date(item.updatedAt) : item.updatedAt,
+          dateTime: item.dateTime ? new Date(item.dateTime) : item.dateTime,
+          closingDate: item.closingDate ? new Date(item.closingDate) : item.closingDate
+        }));
+      } else if (parsed && typeof parsed === 'object') {
+        return {
+          ...parsed,
+          createdAt: parsed.createdAt ? new Date(parsed.createdAt) : parsed.createdAt,
+          updatedAt: parsed.updatedAt ? new Date(parsed.updatedAt) : parsed.updatedAt
+        };
+      }
+      return parsed;
+    }
+  } catch (error) {
+    console.warn(`Failed to load ${key} from localStorage:`, error);
+  }
+  return defaultValue;
+};
+
+const saveToStorage = <T>(key: string, data: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.warn(`Failed to save ${key} to localStorage:`, error);
+  }
+};
+
+// Default mock data (used only for first-time initialization)
+const defaultContacts: Contact[] = [
   {
     id: '1',
     firstName: 'John',
@@ -50,7 +98,7 @@ const mockContacts: Contact[] = [
   }
 ];
 
-const mockAccounts: Account[] = [
+const defaultAccounts: Account[] = [
   {
     id: '1',
     accountName: 'TechCorp Solutions',
@@ -97,7 +145,7 @@ const mockAccounts: Account[] = [
   }
 ];
 
-const mockDeals: ActiveDeal[] = [
+const defaultDeals: ActiveDeal[] = [
   {
     id: '1',
     dealOwner: 'Sales Rep 1',
@@ -163,7 +211,7 @@ const mockDeals: ActiveDeal[] = [
   }
 ];
 
-const mockLeads: Lead[] = [
+const defaultLeads: Lead[] = [
   {
     id: '1',
     firstName: 'Alice',
@@ -200,7 +248,7 @@ const mockLeads: Lead[] = [
   }
 ];
 
-const mockActivities: ActivityLog[] = [
+const defaultActivities: ActivityLog[] = [
   {
     id: '1',
     activityType: 'Call',
@@ -231,7 +279,7 @@ const mockActivities: ActivityLog[] = [
   }
 ];
 
-const mockUserProfile: UserProfile = {
+const defaultUserProfile: UserProfile = {
   id: '1',
   firstName: 'Demo',
   lastName: 'User',
@@ -239,7 +287,7 @@ const mockUserProfile: UserProfile = {
   phone: '+1-555-0100',
   title: 'Sales Manager',
   department: 'Sales',
-  role: 'Sales Manager',
+  role: 'SALES_MANAGER',
   profilePhoto: '',
   timezone: 'EST',
   language: 'en',
@@ -251,6 +299,22 @@ const mockUserProfile: UserProfile = {
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-07')
 };
+
+// Persistent storage arrays (loaded from localStorage with fallback to defaults)
+let mockContacts: Contact[] = loadFromStorage(STORAGE_KEYS.CONTACTS, defaultContacts);
+let mockAccounts: Account[] = loadFromStorage(STORAGE_KEYS.ACCOUNTS, defaultAccounts);
+let mockDeals: ActiveDeal[] = loadFromStorage(STORAGE_KEYS.DEALS, defaultDeals);
+let mockLeads: Lead[] = loadFromStorage(STORAGE_KEYS.LEADS, defaultLeads);
+let mockActivities: ActivityLog[] = loadFromStorage(STORAGE_KEYS.ACTIVITIES, defaultActivities);
+let mockUserProfile: UserProfile = loadFromStorage(STORAGE_KEYS.USER_PROFILE, defaultUserProfile);
+
+// Helper function to persist contacts
+const persistContacts = () => saveToStorage(STORAGE_KEYS.CONTACTS, mockContacts);
+const persistAccounts = () => saveToStorage(STORAGE_KEYS.ACCOUNTS, mockAccounts);
+const persistDeals = () => saveToStorage(STORAGE_KEYS.DEALS, mockDeals);
+const persistLeads = () => saveToStorage(STORAGE_KEYS.LEADS, mockLeads);
+const persistActivities = () => saveToStorage(STORAGE_KEYS.ACTIVITIES, mockActivities);
+const persistUserProfile = () => saveToStorage(STORAGE_KEYS.USER_PROFILE, mockUserProfile);
 
 // Mock API implementation
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -292,6 +356,7 @@ export const mockApi = {
         updatedBy: 'demo-user'
       };
       mockContacts.push(newContact);
+      persistContacts(); // Save to localStorage
       return {
         success: true,
         data: newContact,
@@ -304,6 +369,7 @@ export const mockApi = {
       const index = mockContacts.findIndex(c => c.id === id);
       if (index !== -1) {
         mockContacts[index] = { ...mockContacts[index], ...data, updatedAt: new Date() };
+        persistContacts(); // Save to localStorage
         return {
           success: true,
           data: mockContacts[index],
@@ -318,6 +384,7 @@ export const mockApi = {
       const index = mockContacts.findIndex(c => c.id === id);
       if (index !== -1) {
         mockContacts.splice(index, 1);
+        persistContacts(); // Save to localStorage
         return { success: true, message: 'Contact deleted successfully' };
       }
       return { success: false, message: 'Contact not found' };
@@ -360,6 +427,7 @@ export const mockApi = {
         updatedBy: 'demo-user'
       };
       mockAccounts.push(newAccount);
+      persistAccounts(); // Save to localStorage
       return {
         success: true,
         data: newAccount,
@@ -372,6 +440,7 @@ export const mockApi = {
       const index = mockAccounts.findIndex(a => a.id === id);
       if (index !== -1) {
         mockAccounts[index] = { ...mockAccounts[index], ...data, updatedAt: new Date() };
+        persistAccounts(); // Save to localStorage
         return {
           success: true,
           data: mockAccounts[index],
@@ -386,6 +455,7 @@ export const mockApi = {
       const index = mockAccounts.findIndex(a => a.id === id);
       if (index !== -1) {
         mockAccounts.splice(index, 1);
+        persistAccounts(); // Save to localStorage
         return { success: true, message: 'Account deleted successfully' };
       }
       return { success: false, message: 'Account not found' };
@@ -428,6 +498,7 @@ export const mockApi = {
         updatedBy: 'demo-user'
       };
       mockDeals.push(newDeal);
+      persistDeals(); // Save to localStorage
       return {
         success: true,
         data: newDeal,
@@ -440,6 +511,7 @@ export const mockApi = {
       const index = mockDeals.findIndex(d => d.id === id);
       if (index !== -1) {
         mockDeals[index] = { ...mockDeals[index], ...data, updatedAt: new Date() };
+        persistDeals(); // Save to localStorage
         return {
           success: true,
           data: mockDeals[index],
@@ -454,6 +526,7 @@ export const mockApi = {
       const index = mockDeals.findIndex(d => d.id === id);
       if (index !== -1) {
         mockDeals.splice(index, 1);
+        persistDeals(); // Save to localStorage
         return { success: true, message: 'Deal deleted successfully' };
       }
       return { success: false, message: 'Deal not found' };
@@ -496,6 +569,7 @@ export const mockApi = {
         updatedBy: 'demo-user'
       };
       mockLeads.push(newLead);
+      persistLeads(); // Save to localStorage
       return {
         success: true,
         data: newLead,
@@ -508,6 +582,7 @@ export const mockApi = {
       const index = mockLeads.findIndex(l => l.id === id);
       if (index !== -1) {
         mockLeads[index] = { ...mockLeads[index], ...data, updatedAt: new Date() };
+        persistLeads(); // Save to localStorage
         return {
           success: true,
           data: mockLeads[index],
@@ -522,6 +597,7 @@ export const mockApi = {
       const index = mockLeads.findIndex(l => l.id === id);
       if (index !== -1) {
         mockLeads.splice(index, 1);
+        persistLeads(); // Save to localStorage
         return { success: true, message: 'Lead deleted successfully' };
       }
       return { success: false, message: 'Lead not found' };
@@ -564,6 +640,7 @@ export const mockApi = {
         updatedBy: 'demo-user'
       };
       mockActivities.push(newActivity);
+      persistActivities(); // Save to localStorage
       return {
         success: true,
         data: newActivity,
@@ -576,6 +653,7 @@ export const mockApi = {
       const index = mockActivities.findIndex(a => a.id === id);
       if (index !== -1) {
         mockActivities[index] = { ...mockActivities[index], ...data, updatedAt: new Date() };
+        persistActivities(); // Save to localStorage
         return {
           success: true,
           data: mockActivities[index],
@@ -590,6 +668,7 @@ export const mockApi = {
       const index = mockActivities.findIndex(a => a.id === id);
       if (index !== -1) {
         mockActivities.splice(index, 1);
+        persistActivities(); // Save to localStorage
         return { success: true, message: 'Activity deleted successfully' };
       }
       return { success: false, message: 'Activity not found' };
@@ -609,6 +688,7 @@ export const mockApi = {
     async updateCurrent(data: any): Promise<ApiResponse<UserProfile>> {
       await delay(400);
       Object.assign(mockUserProfile, data, { updatedAt: new Date() });
+      persistUserProfile(); // Save to localStorage
       return {
         success: true,
         data: mockUserProfile,
@@ -628,6 +708,7 @@ export const mockApi = {
     async update(id: string, data: any): Promise<ApiResponse<UserProfile>> {
       await delay(400);
       Object.assign(mockUserProfile, data, { updatedAt: new Date() });
+      persistUserProfile(); // Save to localStorage
       return {
         success: true,
         data: mockUserProfile,
