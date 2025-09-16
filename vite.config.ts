@@ -11,6 +11,13 @@ export default defineConfig(({ mode }) => ({
       allow: ["./client", "./shared", "./"],
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
     },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   build: {
     outDir: "dist/spa",
@@ -24,7 +31,7 @@ export default defineConfig(({ mode }) => ({
       jsxImportSource: "react",
       plugins: [],
     }),
-    expressPlugin()
+    // No longer need expressPlugin since we use proxy
   ],
   resolve: {
     alias: {
@@ -42,24 +49,3 @@ export default defineConfig(({ mode }) => ({
     jsxImportSource: "react",
   },
 }));
-
-function expressPlugin(): Plugin {
-  return {
-    name: "express-plugin",
-    apply: "serve", // Only apply during development (serve mode)
-    configureServer(server) {
-      // Dynamically import the server to avoid loading Prisma during config time
-      server.middlewares.use('/api', async (req, res, next) => {
-        try {
-          const { createServer } = await import("./server");
-          const app = createServer();
-          app(req, res, next);
-        } catch (error) {
-          console.error('Error loading server:', error);
-          res.statusCode = 500;
-          res.end('Server error: ' + error.message);
-        }
-      });
-    },
-  };
-}

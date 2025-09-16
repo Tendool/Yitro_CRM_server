@@ -1,8 +1,80 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { prisma } from "./prisma.js";
+import { dbFallback } from "./database-fallback.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key";
+
+// Database operation wrapper that tries Prisma first, then fallback
+class DatabaseOperations {
+  static async findUserByEmail(email: string) {
+    try {
+      return await prisma.authUser.findUnique({ where: { email } });
+    } catch (error) {
+      console.log('Prisma failed, using fallback database for findUserByEmail');
+      return await dbFallback.findUserByEmail(email);
+    }
+  }
+
+  static async createAuthUser(userData: any) {
+    try {
+      return await prisma.authUser.create({ data: userData });
+    } catch (error) {
+      console.log('Prisma failed, using fallback database for createAuthUser');
+      return await dbFallback.createUser({
+        email: userData.email,
+        displayName: userData.displayName,
+        passwordHash: userData.passwordHash,
+        role: userData.role || 'user'
+      });
+    }
+  }
+
+  static async updateAuthUser(id: string, updates: any) {
+    try {
+      return await prisma.authUser.update({ where: { id }, data: updates });
+    } catch (error) {
+      console.log('Prisma failed, using fallback database for updateAuthUser');
+      return await dbFallback.updateUser(id, updates);
+    }
+  }
+
+  static async createSession(sessionData: any) {
+    try {
+      return await prisma.authSession.create({ data: sessionData });
+    } catch (error) {
+      console.log('Prisma failed, using fallback database for createSession');
+      return await dbFallback.createSession(sessionData);
+    }
+  }
+
+  static async findActiveSession(tokenHash: string) {
+    try {
+      return await prisma.authSession.findFirst({
+        where: {
+          tokenHash,
+          isActive: true,
+          expiresAt: { gt: new Date() }
+        }
+      });
+    } catch (error) {
+      console.log('Prisma failed, using fallback database for findActiveSession');
+      return await dbFallback.findActiveSession(tokenHash);
+    }
+  }
+
+  static async deactivateUserSessions(userId: string) {
+    try {
+      return await prisma.authSession.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false }
+      });
+    } catch (error) {
+      console.log('Prisma failed, using fallback database for deactivateUserSessions');
+      return await dbFallback.deactivateUserSessions(userId);
+    }
+  }
+}
 
 export interface User {
   id: string;
