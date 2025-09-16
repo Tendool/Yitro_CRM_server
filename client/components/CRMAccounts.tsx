@@ -89,7 +89,7 @@ export function CRMAccounts() {
       if (editingAccount) {
         // Update existing account
         console.log("Updating existing account:", editingAccount.id);
-        updateAccount(editingAccount.id, formData);
+        await updateAccount(editingAccount.id, formData);
         alert("Account updated successfully!");
       } else {
         // Create new account with proper field mapping
@@ -130,12 +130,17 @@ export function CRMAccounts() {
     setShowNewAccountDialog(true);
   };
 
-  const handleDeleteAccount = (accountId: number) => {
+  const handleDeleteAccount = async (accountId: number) => {
     console.log("handleDeleteAccount called with ID:", accountId);
     if (window.confirm("Are you sure you want to delete this account?")) {
-      deleteAccount(accountId);
-      console.log("Account deleted:", accountId);
-      alert("Account deleted successfully!");
+      try {
+        await deleteAccount(accountId);
+        console.log("Account deleted:", accountId);
+        alert("Account deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting account:", error);
+        alert("Error deleting account. Please try again.");
+      }
     }
   };
 

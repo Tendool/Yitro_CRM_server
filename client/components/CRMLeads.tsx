@@ -82,7 +82,7 @@ export function CRMLeads() {
 
   // Leads data comes from CRM context
 
-  const handleSaveLead = () => {
+  const handleSaveLead = async () => {
     console.log("Saving lead:", formData);
 
     if (!formData.name || !formData.company) {
@@ -94,7 +94,7 @@ export function CRMLeads() {
       if (editingLead) {
         // Update existing lead
         console.log("Updating existing lead:", editingLead.id);
-        updateLead(editingLead.id, formData);
+        await updateLead(editingLead.id, formData);
         alert("Lead updated successfully!");
       } else {
         // Create new lead
@@ -111,7 +111,7 @@ export function CRMLeads() {
           lastActivity: "Just now",
         };
         console.log("Creating new lead:", newLeadData);
-        addLead(newLeadData);
+        await addLead(newLeadData);
         alert("Lead created successfully!");
       }
 
@@ -131,12 +131,17 @@ export function CRMLeads() {
     setShowNewLeadDialog(true);
   };
 
-  const handleDeleteLead = (leadId: number) => {
+  const handleDeleteLead = async (leadId: number) => {
     console.log("handleDeleteLead called with ID:", leadId);
     if (window.confirm("Are you sure you want to delete this lead?")) {
-      deleteLead(leadId);
-      console.log("Lead deleted:", leadId);
-      alert("Lead deleted successfully!");
+      try {
+        await deleteLead(leadId);
+        console.log("Lead deleted:", leadId);
+        alert("Lead deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting lead:", error);
+        alert("Error deleting lead. Please try again.");
+      }
     }
   };
 
