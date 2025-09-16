@@ -47,6 +47,8 @@ echo Starting development servers...
 echo Frontend: http://localhost:8080
 echo API: http://localhost:3001
 echo.
+echo Alternative: You can also use "npm start dev" from now on
+echo.
 echo Test accounts:
 echo   Admin: admin@yitro.com / admin123
 echo   User: user@yitro.com / admin123

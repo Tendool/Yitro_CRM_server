@@ -1,8 +1,8 @@
+/// <reference types="../types/express" />
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken';
 import { dbFallback } from "../lib/database-fallback.js";
-import "../types/express"; // Include Express type extensions
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key-for-testing";

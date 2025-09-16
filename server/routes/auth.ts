@@ -1,9 +1,9 @@
+/// <reference types="../types/express" />
 import express from "express";
 import { authService, User } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import "../types/express"; // Include Express type extensions
 
 const router = express.Router();
 const prisma = new PrismaClient();
