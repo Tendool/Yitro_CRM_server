@@ -1,7 +1,6 @@
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { createServer } from "./server";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -9,7 +8,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     fs: {
-      allow: ["./client", "./shared"],
+      allow: ["./client", "./shared", "./"],
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
     },
   },
@@ -49,10 +48,18 @@ function expressPlugin(): Plugin {
     name: "express-plugin",
     apply: "serve", // Only apply during development (serve mode)
     configureServer(server) {
-      const app = createServer();
-
-      // Add Express app as middleware to Vite dev server
-      server.middlewares.use(app);
+      // Dynamically import the server to avoid loading Prisma during config time
+      server.middlewares.use('/api', async (req, res, next) => {
+        try {
+          const { createServer } = await import("./server");
+          const app = createServer();
+          app(req, res, next);
+        } catch (error) {
+          console.error('Error loading server:', error);
+          res.statusCode = 500;
+          res.end('Server error: ' + error.message);
+        }
+      });
     },
   };
 }
