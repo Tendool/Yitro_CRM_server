@@ -30,14 +30,14 @@ interface NewUserForm {
   contactNumber: string;
   department: string;
   designation: string;
-  role: "ADMIN" | "USER";
+  role: "admin" | "user";
 }
 
 interface DatabaseUser {
   id: string;
   email: string;
   displayName: string;
-  role: "ADMIN" | "USER";
+  role: string;
   emailVerified: boolean;
   createdAt: string;
   contactNumber?: string;

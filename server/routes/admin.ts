@@ -74,18 +74,18 @@ const generateCompanyEmail = (
 // Get all users (admin only)
 router.get("/users", requireAdmin, async (req, res) => {
   try {
-    const userProfiles = await prisma.userProfile.findMany({
+    const authUsers = await prisma.authUser.findMany({
       orderBy: { createdAt: "desc" },
     });
 
-    const users = userProfiles.map((user) => ({
+    const users = authUsers.map((user) => ({
       id: user.id,
       email: user.email,
-      displayName: `${user.firstName} ${user.lastName}`.trim(),
-      role: user.role?.toLowerCase() || "user",
-      emailVerified: true, // Simplified for SQLite version
+      displayName: user.displayName,
+      role: user.role?.toUpperCase() || "USER",
+      emailVerified: user.emailVerified,
       createdAt: user.createdAt,
-      lastLogin: user.updatedAt, // Use updatedAt as proxy for last login
+      lastLogin: user.lastLogin || user.updatedAt,
     }));
 
     res.json({
@@ -104,7 +104,7 @@ router.get("/users", requireAdmin, async (req, res) => {
 // Create new user (admin only) - simplified for SQLite
 router.post("/create-user", requireAdmin, async (req, res) => {
   try {
-    const { email, displayName, role, contactNumber, department } = req.body;
+    const { email, displayName, password, role, contactNumber, department } = req.body;
 
     if (!email || !displayName || !role) {
       return res.status(400).json({
@@ -114,7 +114,7 @@ router.post("/create-user", requireAdmin, async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.userProfile.findUnique({
+    const existingUser = await prisma.authUser.findUnique({
       where: { email },
     });
 
@@ -125,15 +125,21 @@ router.post("/create-user", requireAdmin, async (req, res) => {
       });
     }
 
-    // Create user profile
-    const newUser = await prisma.userProfile.create({
+    // Generate secure password if not provided
+    const userPassword = password || generatePassword();
+    
+    // Hash password
+    const bcrypt = await import('bcryptjs');
+    const hashedPassword = await bcrypt.hash(userPassword, 12);
+
+    // Create auth user
+    const newUser = await prisma.authUser.create({
       data: {
         email,
-        firstName: displayName.split(" ")[0] || displayName,
-        lastName: displayName.split(" ").slice(1).join(" ") || "",
-        phone: contactNumber,
-        department,
-        role: mapRoleToPrismaEnum(role),
+        displayName,
+        passwordHash: hashedPassword,
+        role: role.toLowerCase(),
+        emailVerified: true, // Simplified for SQLite version
       },
     });
 
@@ -142,10 +148,10 @@ router.post("/create-user", requireAdmin, async (req, res) => {
       user: {
         id: newUser.id,
         email: newUser.email,
-        displayName: `${newUser.firstName} ${newUser.lastName}`.trim(),
-        role: newUser.role?.toLowerCase(),
-        contactNumber: newUser.phone,
-        department: newUser.department,
+        displayName: newUser.displayName,
+        role: newUser.role?.toUpperCase(),
+        contactNumber,
+        department,
       },
       message: "User created successfully.",
     });
@@ -164,7 +170,7 @@ router.delete("/users/:id", requireAdmin, async (req, res) => {
     const { id } = req.params;
 
     // Check if user exists
-    const user = await prisma.userProfile.findUnique({
+    const user = await prisma.authUser.findUnique({
       where: { id },
     });
 
@@ -184,7 +190,7 @@ router.delete("/users/:id", requireAdmin, async (req, res) => {
     }
 
     // Delete the user
-    await prisma.userProfile.delete({
+    await prisma.authUser.delete({
       where: { id },
     });
 
@@ -229,24 +235,9 @@ router.put("/users/:id/role", requireAdmin, async (req, res) => {
       });
     }
 
-    // Map role to Prisma enum format
-    const mapRoleToPrismaEnum = (r: string) => {
-      const roleMap: { [key: string]: string } = {
-        "admin": "ADMIN",
-        "user": "USER",
-        "sales_manager": "SALES_MANAGER",
-        "sales_rep": "SALES_REP",
-        "Admin": "ADMIN",
-        "User": "USER",
-        "Sales Manager": "SALES_MANAGER",
-        "Sales Rep": "SALES_REP"
-      };
-      return roleMap[r] || "USER";
-    };
-
-    await prisma.userProfile.update({
+    await prisma.authUser.update({
       where: { id },
-      data: { role: mapRoleToPrismaEnum(role) },
+      data: { role: role.toLowerCase() },
     });
 
     res.json({
@@ -275,7 +266,7 @@ router.get("/statistics", requireAdmin, async (req, res) => {
       totalActivities,
       wonDeals
     ] = await Promise.all([
-      prisma.userProfile.count(),
+      prisma.authUser.count(),
       prisma.contact.count(),
       prisma.account.count(),
       prisma.lead.count(),
@@ -308,11 +299,10 @@ router.get("/statistics", requireAdmin, async (req, res) => {
     }, 0);
 
     // Get user activity summary
-    const userStats = await prisma.userProfile.findMany({
+    const userStats = await prisma.authUser.findMany({
       select: {
         id: true,
-        firstName: true,
-        lastName: true,
+        displayName: true,
         email: true,
         role: true,
         createdAt: true
@@ -343,7 +333,7 @@ router.get("/statistics", requireAdmin, async (req, res) => {
         })),
         userStats: userStats.map(user => ({
           id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
+          name: user.displayName,
           email: user.email,
           role: user.role,
           joinedAt: user.createdAt
