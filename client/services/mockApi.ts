@@ -239,7 +239,7 @@ const mockUserProfile: UserProfile = {
   phone: '+1-555-0100',
   title: 'Sales Manager',
   department: 'Sales',
-  role: 'Sales Manager',
+  role: 'SALES_MANAGER',
   profilePhoto: '',
   timezone: 'EST',
   language: 'en',

@@ -18,7 +18,7 @@
 
 ### Option 3: Manual Setup
 1. Install dependencies: `npm install`
-2. Start development servers: `npm run dev:full`
+2. Start development servers: `npm run dev:full` or `npm start dev`
 
 ### Accessing the Application
 - **Frontend**: http://localhost:8080
@@ -57,6 +57,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - Try running `node --version` to verify installation
 
 ### Development Commands
+- `npm start dev` - **NEW**: Start both frontend and API servers (convenience command)
 - `npm run dev` - Start frontend only (port 8080)
 - `npm run dev:api` - Start API only (port 3001)  
 - `npm run dev:full` - Start both frontend and API

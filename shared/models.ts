@@ -84,10 +84,14 @@ export interface ActiveDeal {
   updatedBy: string;
 }
 
+// Type alias for compatibility
+export type Deal = ActiveDeal;
+
 export interface Lead {
   id: string;
   firstName: string;
   lastName: string;
+  name?: string; // Computed field: firstName + lastName
   company: string;
   title?: string;
   phone?: string;
@@ -95,6 +99,8 @@ export interface Lead {
   leadSource?: 'Website' | 'Referral' | 'Trade Show' | 'Cold Call' | 'Email' | 'Partner';
   status?: 'New' | 'Working' | 'Qualified' | 'Unqualified';
   rating?: 'Hot' | 'Warm' | 'Cold';
+  score?: number; // Lead scoring
+  value?: string; // Potential deal value
   owner?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -159,10 +165,36 @@ export interface CreateContactRequest extends Omit<Contact, 'id' | 'createdAt' |
 export interface UpdateContactRequest extends Partial<CreateContactRequest> {}
 
 export interface CreateAccountRequest extends Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'> {}
-export interface UpdateAccountRequest extends Partial<CreateAccountRequest> {}
+export interface UpdateAccountRequest {
+  accountName?: string;
+  accountRating?: string; // Allow string for form compatibility
+  accountOwner?: string;
+  status?: string; // Allow string for form compatibility
+  industry?: string;
+  revenue?: string;
+  numberOfEmployees?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipPostCode?: string;
+  timeZone?: string;
+  boardNumber?: string;
+  website?: string;
+  geo?: string; // Allow string for form compatibility
+}
 
 export interface CreateActivityRequest extends Omit<ActivityLog, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'> {}
-export interface UpdateActivityRequest extends Partial<CreateActivityRequest> {}
+export interface UpdateActivityRequest {
+  activityType?: string; // Allow string for form compatibility
+  associatedContact?: string;
+  associatedAccount?: string;
+  dateTime?: Date;
+  followUpSchedule?: string;
+  summary?: string;
+  outcomeDisposition?: string; // Allow string for form compatibility
+}
 
 export interface CreateDealRequest extends Omit<ActiveDeal, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'> {}
 export interface UpdateDealRequest extends Partial<CreateDealRequest> {}
