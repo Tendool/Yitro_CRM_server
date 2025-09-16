@@ -161,7 +161,7 @@ export class AuthService {
         where: { email: data.email },
       });
 
-      // Check if this is admin@yitro.com or admin@yitrobc.net for demo
+      // Check if this is admin email for demo
       const isAdminEmail = data.email === 'admin@yitro.com' || 
                           data.email === 'admin@yitrobc.net' ||
                           data.email === 'admin@yitroglobal.com';
@@ -170,8 +170,13 @@ export class AuthService {
                              data.password === 'admain123' ||
                              data.password === 'password';
 
-      // For demo accounts, allow basic password validation
-      if (isAdminEmail && isValidPassword) {
+      // For admin accounts, always validate password regardless of user existence
+      if (isAdminEmail) {
+        if (!isValidPassword) {
+          console.log('❌ Invalid password for admin account:', data.email);
+          throw new Error('Invalid email or password');
+        }
+        
         console.log('✅ Admin account access granted');
         
         // If user doesn't exist, create them
@@ -191,8 +196,8 @@ export class AuthService {
           console.log('✅ Created new admin user profile');
         }
       } else if (userRecord) {
-        // For existing non-admin users, just allow them through for demo
-        console.log('✅ Existing user found, allowing access');
+        // For existing non-admin users, just allow them through for demo (this would be password validation in production)
+        console.log('✅ Existing user found, allowing access (demo mode)');
       } else {
         console.log('❌ Invalid credentials for:', data.email);
         throw new Error('Invalid email or password');
