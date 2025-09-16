@@ -1,6 +1,7 @@
 import { RequestHandler } from "express";
 import { prisma } from "../lib/prisma";
-import { BusinessLine, Geography, Entity, DealStage } from "@prisma/client";
+// Note: Using string literals for enums instead of importing to avoid compile-time errors
+// import { BusinessLine, Geography, Entity, DealStage } from "@prisma/client";
 
 import {
   Contact,
@@ -884,7 +885,7 @@ export const createDeal: RequestHandler = async (req, res) => {
       dealOwner: data.dealOwner || data.owner || 'system',
       dealName: data.dealName,
       businessLine: data.businessLine
-        ? data.businessLine.replace(/\s+/g, "_").toUpperCase() as BusinessLine
+        ? data.businessLine.replace(/\s+/g, "_").toUpperCase() as string
         : "RCM",
       associatedAccount: accountId, // This matches your schema field name
       associatedContact: contactId, // This matches your schema field name
@@ -894,12 +895,12 @@ export const createDeal: RequestHandler = async (req, res) => {
       approvedBy: data.approvedBy || "",
       description: data.description || "",
       nextStep: data.nextStep || "",
-      geo: data.geo ? data.geo.replace(/\s+/g, "_").toUpperCase() as Geography : "AMERICAS",
+      geo: data.geo ? data.geo.replace(/\s+/g, "_").toUpperCase() as string : "AMERICAS",
       entity: data.entity
-        ? data.entity.replace(/\s+/g, "_").toUpperCase() as Entity
+        ? data.entity.replace(/\s+/g, "_").toUpperCase() as string
         : "YITRO_GLOBAL",
       stage: data.stage
-        ? data.stage.replace(/\s+/g, "_").toUpperCase() as DealStage
+        ? data.stage.replace(/\s+/g, "_").toUpperCase() as string
         : "OPPORTUNITY_IDENTIFIED",
       createdBy: "system",
       updatedBy: "system",

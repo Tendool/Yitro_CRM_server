@@ -2,6 +2,7 @@ import express from "express";
 import { authService } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";
 import { prisma } from "../lib/prisma.js";
+import "../types/express"; // Include Express type extensions
 
 const router = express.Router();
 
@@ -372,8 +373,7 @@ router.post("/send-test-email", requireAdmin, async (req, res) => {
     }
 
     await emailService.sendTestEmail(
-      recipientEmail,
-      recipientName || "Test User",
+      recipientEmail
     );
 
     res.json({
