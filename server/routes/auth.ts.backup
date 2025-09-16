@@ -104,22 +104,6 @@ router.post("/signin", async (req, res) => {
 
     const result = await authService.signIn({ email, password });
 
-    // Create session record if tables exist
-    try {
-      await prisma.authSession.create({
-        data: {
-          userId: result.user.id,
-          token: result.token,
-          ipAddress: req.ip || 'unknown',
-          userAgent: req.headers['user-agent'] || 'unknown',
-          isActive: true,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-        }
-      });
-    } catch (sessionError) {
-      console.log('Session creation failed (non-critical):', sessionError.message);
-    }
-
     // Send login notification email
     try {
       const loginDetails = {
@@ -356,46 +340,10 @@ router.post("/validate-token", async (req, res) => {
   }
 });
 
-// Get current user profile (/me endpoint) - Fixed
-router.get("/me", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user?.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: "Invalid authentication - no user ID"
-      });
-    }
-
-    // Use your existing authService instead of direct Prisma
-    const user = await authService.getUserById(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found"
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: { user }
-    });
-
-  } catch (error: any) {
-    console.error('Get user profile error:', error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal server error: " + error.message
-    });
-  }
-});
-
-// Logout/Signout endpoint - Fixed
+// Logout/Signout endpoint
 router.post("/signout", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId;
+    const userId = (req as any).user?.userId;
 
     if (!userId) {
       return res.status(401).json({
@@ -404,23 +352,18 @@ router.post("/signout", authenticateToken, async (req, res) => {
       });
     }
 
-    // Try to deactivate sessions if table exists
-    let deactivatedSessions = { count: 0 };
-    try {
-      deactivatedSessions = await prisma.authSession.updateMany({
-        where: {
-          userId: userId,
-          isActive: true
-        },
-        data: {
-          isActive: false
-        }
-      });
-    } catch (sessionError) {
-      console.log('Session deactivation failed (non-critical):', sessionError.message);
-    }
+    // Deactivate all active sessions for this user
+    const deactivatedSessions = await prisma.authSession.updateMany({
+      where: {
+        userId: userId,
+        isActive: true
+      },
+      data: {
+        isActive: false
+      }
+    });
 
-    // Log the signout activity if table exists
+    // Log the signout activity (optional - may fail if table doesn't exist)
     try {
       await prisma.authActivityLog.create({
         data: {
@@ -444,11 +387,11 @@ router.post("/signout", authenticateToken, async (req, res) => {
       }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Signout error:', error);
     return res.status(500).json({
       success: false,
-      error: "Internal server error during signout: " + error.message
+      error: "Internal server error during signout"
     });
   }
 });
@@ -456,7 +399,7 @@ router.post("/signout", authenticateToken, async (req, res) => {
 // Alternative logout endpoint
 router.post("/logout", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId;
+    const userId = (req as any).user?.userId;
 
     if (!userId) {
       return res.status(401).json({
@@ -465,20 +408,15 @@ router.post("/logout", authenticateToken, async (req, res) => {
       });
     }
 
-    let deactivatedSessions = { count: 0 };
-    try {
-      deactivatedSessions = await prisma.authSession.updateMany({
-        where: {
-          userId: userId,
-          isActive: true
-        },
-        data: {
-          isActive: false
-        }
-      });
-    } catch (sessionError) {
-      console.log('Session deactivation failed (non-critical):', sessionError.message);
-    }
+    const deactivatedSessions = await prisma.authSession.updateMany({
+      where: {
+        userId: userId,
+        isActive: true
+      },
+      data: {
+        isActive: false
+      }
+    });
 
     try {
       await prisma.authActivityLog.create({
@@ -501,19 +439,19 @@ router.post("/logout", authenticateToken, async (req, res) => {
       }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Logout error:', error);
     return res.status(500).json({
       success: false,
-      error: "Internal server error during logout: " + error.message
+      error: "Internal server error during logout"
     });
   }
 });
 
-// Get active sessions (for current user) - Fixed
-router.get("/sessions", authenticateToken, async (req, res) => {
+// Get current user profile (/me endpoint)
+router.get("/me", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId;
+    const userId = (req as any).user?.userId;
 
     if (!userId) {
       return res.status(401).json({
@@ -522,45 +460,26 @@ router.get("/sessions", authenticateToken, async (req, res) => {
       });
     }
 
-    let sessions = [];
-    try {
-      sessions = await prisma.authSession.findMany({
-        where: {
-          userId: userId,
-          isActive: true,
-          expiresAt: {
-            gt: new Date()
-          }
-        },
-        select: {
-          id: true,
-          createdAt: true,
-          expiresAt: true,
-          ipAddress: true,
-          userAgent: true
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
+    // Use your existing authService instead of direct Prisma
+    const user = await authService.getUserById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
       });
-    } catch (sessionError) {
-      console.log('Session retrieval failed (non-critical):', sessionError.message);
-      // Return empty array if session table doesn't exist
     }
 
     return res.status(200).json({
       success: true,
-      data: {
-        sessions,
-        count: sessions.length
-      }
+      data: { user }
     });
 
-  } catch (error: any) {
-    console.error('Get sessions error:', error);
+  } catch (error) {
+    console.error('Get user profile error:', error);
     return res.status(500).json({
       success: false,
-      error: "Internal server error: " + error.message
+      error: "Internal server error"
     });
   }
 });
@@ -568,7 +487,7 @@ router.get("/sessions", authenticateToken, async (req, res) => {
 // Session cleanup endpoint (for maintenance)
 router.post("/cleanup-sessions", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId;
+    const userId = (req as any).user?.userId;
 
     // Get user info using your authService
     const user = await authService.getUserById(userId);
@@ -580,34 +499,27 @@ router.post("/cleanup-sessions", authenticateToken, async (req, res) => {
       });
     }
 
-    let expiredSessions = { count: 0 };
-    let oldInactiveSessions = { count: 0 };
-
-    try {
-      // Clean up expired sessions
-      expiredSessions = await prisma.authSession.deleteMany({
-        where: {
-          expiresAt: {
-            lt: new Date()
-          }
+    // Clean up expired sessions
+    const expiredSessions = await prisma.authSession.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date()
         }
-      });
+      }
+    });
 
-      // Clean up old inactive sessions (older than 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Clean up old inactive sessions (older than 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      oldInactiveSessions = await prisma.authSession.deleteMany({
-        where: {
-          isActive: false,
-          createdAt: {
-            lt: thirtyDaysAgo
-          }
+    const oldInactiveSessions = await prisma.authSession.deleteMany({
+      where: {
+        isActive: false,
+        createdAt: {
+          lt: thirtyDaysAgo
         }
-      });
-    } catch (cleanupError) {
-      console.log('Session cleanup failed (non-critical):', cleanupError.message);
-    }
+      }
+    });
 
     return res.status(200).json({
       success: true,
@@ -618,11 +530,60 @@ router.post("/cleanup-sessions", authenticateToken, async (req, res) => {
       }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Session cleanup error:', error);
     return res.status(500).json({
       success: false,
-      error: "Internal server error during cleanup: " + error.message
+      error: "Internal server error during cleanup"
+    });
+  }
+});
+
+// Get active sessions (for current user)
+router.get("/sessions", authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid authentication"
+      });
+    }
+
+    const sessions = await prisma.authSession.findMany({
+      where: {
+        userId: userId,
+        isActive: true,
+        expiresAt: {
+          gt: new Date()
+        }
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        expiresAt: true,
+        ipAddress: true,
+        userAgent: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        sessions,
+        count: sessions.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Get sessions error:', error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error"
     });
   }
 });
