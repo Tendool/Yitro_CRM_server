@@ -228,7 +228,12 @@ export class AuthService {
     try {
       console.log('🔐 Attempting signin for:', data.email);
 
-      // First, try to find user in UserProfile (current table)
+      // First, try to find user in AuthUser table (where admin creates users)
+      let authUser = await prisma.authUser.findUnique({
+        where: { email: data.email },
+      });
+
+      // Fallback to UserProfile for backward compatibility
       let userRecord = await prisma.userProfile.findUnique({
         where: { email: data.email },
       });
@@ -251,7 +256,7 @@ export class AuthService {
         
         console.log('✅ Admin account access granted');
         
-        // If user doesn't exist, create them
+        // If user doesn't exist in UserProfile, create them for compatibility
         if (!userRecord) {
           const role = this.determineUserRole(data.email);
           userRecord = await prisma.userProfile.create({
@@ -267,9 +272,37 @@ export class AuthService {
           });
           console.log('✅ Created new admin user profile');
         }
+      } else if (authUser) {
+        // User created via admin panel - validate password
+        const bcrypt = await import('bcryptjs');
+        const isPasswordValid = await bcrypt.compare(data.password, authUser.passwordHash);
+        
+        if (!isPasswordValid) {
+          console.log('❌ Invalid password for user:', data.email);
+          throw new Error('Invalid email or password');
+        }
+        
+        console.log('✅ AuthUser found, password validated');
+        
+        // Create corresponding UserProfile if it doesn't exist for compatibility
+        if (!userRecord) {
+          const [firstName, ...lastNameParts] = authUser.displayName.split(' ');
+          userRecord = await prisma.userProfile.create({
+            data: {
+              email: authUser.email,
+              firstName: firstName || authUser.displayName,
+              lastName: lastNameParts.join(' ') || '',
+              role: this.mapRoleToPrismaEnum(authUser.role || 'user'),
+              emailNotifications: true,
+              smsNotifications: false,
+              pushNotifications: true,
+            },
+          });
+          console.log('✅ Created UserProfile for AuthUser');
+        }
       } else if (userRecord) {
-        // For existing non-admin users, just allow them through for demo (this would be password validation in production)
-        console.log('✅ Existing user found, allowing access (demo mode)');
+        // For existing non-admin users in UserProfile, just allow them through for demo
+        console.log('✅ Existing UserProfile found, allowing access (demo mode)');
       } else {
         console.log('❌ Invalid credentials for:', data.email);
         throw new Error('Invalid email or password');
