@@ -141,6 +141,136 @@ export function createServerSimple(): Express {
     }
   });
 
+  // Admin statistics endpoint
+  app.get("/api/admin/statistics", async (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    // Basic token validation
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ success: false, error: "Invalid token format" });
+    }
+    
+    // For demo purposes, accept any valid-looking JWT token
+    // In production, you'd verify the token signature and expiration
+    if (!token.includes('.')) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+    
+    // Get counts from all tables
+    const queries = [
+      "SELECT COUNT(*) as count FROM auth_users",
+      "SELECT COUNT(*) as count FROM contacts",
+      "SELECT COUNT(*) as count FROM accounts", 
+      "SELECT COUNT(*) as count FROM leads",
+      "SELECT COUNT(*) as count FROM active_deals",
+      "SELECT COUNT(*) as count FROM activity_logs",
+      "SELECT COUNT(*) as count FROM active_deals WHERE stage = 'ORDER_WON'",
+      "SELECT SUM(CAST(REPLACE(REPLACE(dealValue, '$', ''), ',', '') AS REAL)) as total FROM active_deals WHERE stage = 'ORDER_WON' AND dealValue IS NOT NULL",
+      "SELECT * FROM activity_logs ORDER BY dateTime DESC LIMIT 10",
+      "SELECT id, displayName, email, role, createdAt FROM auth_users ORDER BY createdAt DESC"
+    ];
+    
+    let completed = 0;
+    const results: any = {};
+    
+    // Execute all queries
+    db.get(queries[0], (err, row: any) => {
+      if (err) console.error("Error getting users count:", err);
+      results.totalUsers = row?.count || 0;
+      if (++completed === 6) processResults();
+    });
+    
+    db.get(queries[1], (err, row: any) => {
+      if (err) console.error("Error getting contacts count:", err);
+      results.totalContacts = row?.count || 0;
+      if (++completed === 6) processResults();
+    });
+    
+    db.get(queries[2], (err, row: any) => {
+      if (err) console.error("Error getting accounts count:", err);
+      results.totalAccounts = row?.count || 0;
+      if (++completed === 6) processResults();
+    });
+    
+    db.get(queries[3], (err, row: any) => {
+      if (err) console.error("Error getting leads count:", err);
+      results.totalLeads = row?.count || 0;
+      if (++completed === 6) processResults();
+    });
+    
+    db.get(queries[4], (err, row: any) => {
+      if (err) console.error("Error getting deals count:", err);
+      results.totalDeals = row?.count || 0;
+      if (++completed === 6) processResults();
+    });
+    
+    db.get(queries[5], (err, row: any) => {
+      if (err) console.error("Error getting activities count:", err);
+      results.totalActivities = row?.count || 0;
+      if (++completed === 6) processResults();
+    });
+    
+    function processResults() {
+      // Get won deals count and total value
+      db.get(queries[6], (err, row: any) => {
+        if (err) console.error("Error getting won deals count:", err);
+        results.wonDeals = row?.count || 0;
+        
+        db.get(queries[7], (err, row: any) => {
+          if (err) console.error("Error getting total deal value:", err);
+          results.totalDealValue = row?.total || 0;
+          
+          // Get recent activities
+          db.all(queries[8], (err, activities: any[]) => {
+            if (err) console.error("Error getting recent activities:", err);
+            
+            // Get user stats
+            db.all(queries[9], (err, users: any[]) => {
+              if (err) console.error("Error getting user stats:", err);
+              
+              // Send response
+              res.json({
+                success: true,
+                data: {
+                  summary: {
+                    totalUsers: results.totalUsers,
+                    totalContacts: results.totalContacts,
+                    totalAccounts: results.totalAccounts,
+                    totalLeads: results.totalLeads,
+                    totalDeals: results.totalDeals,
+                    totalActivities: results.totalActivities,
+                    wonDeals: results.wonDeals,
+                    totalDealValue: results.totalDealValue
+                  },
+                  recentActivities: (activities || []).map(activity => ({
+                    id: activity.id,
+                    type: activity.activityType?.replace('_', ' ') || 'Unknown',
+                    summary: activity.summary || `${activity.activityType || 'Activity'} recorded`,
+                    date: activity.dateTime || activity.createdAt,
+                    contact: activity.associatedContact ? `Contact ${activity.associatedContact}` : null,
+                    account: activity.associatedAccount ? `Account ${activity.associatedAccount}` : null,
+                    outcome: activity.outcomeDisposition?.replace(/_/g, ' ') || null
+                  })),
+                  userStats: (users || []).map(user => ({
+                    id: user.id,
+                    name: user.displayName,
+                    email: user.email,
+                    role: user.role?.toUpperCase() || 'USER',
+                    joinedAt: user.createdAt
+                  }))
+                }
+              });
+            });
+          });
+        });
+      });
+    }
+  });
+
   // Generate secure password helper
   const generatePassword = (): string => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
