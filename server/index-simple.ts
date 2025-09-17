@@ -142,10 +142,22 @@ export function createServerSimple(): Express {
   });
 
   // Admin statistics endpoint
-  app.get("/api/admin/statistics", (req, res) => {
+  app.get("/api/admin/statistics", async (req, res) => {
     const authHeader = req.headers["authorization"];
     if (!authHeader) {
       return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    // Basic token validation
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ success: false, error: "Invalid token format" });
+    }
+    
+    // For demo purposes, accept any valid-looking JWT token
+    // In production, you'd verify the token signature and expiration
+    if (!token.includes('.')) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
     }
     
     // Get counts from all tables
