@@ -1,4 +1,3 @@
-/// <reference types="../types/express" />
 import express from "express";
 import { authService } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";
@@ -48,6 +47,28 @@ const requireAdmin = async (req: any, res: any, next: any) => {
   }
 };
 
+// Middleware to check if user is authenticated (admin or user)
+const requireAuth = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res
+      .status(401)
+      .json({ success: false, error: "Access token required" });
+  }
+
+  try {
+    const decoded = authService.verifyToken(token);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res
+      .status(403)
+      .json({ success: false, error: "Invalid or expired token" });
+  }
+};
+
 // Generate secure password
 const generatePassword = (): string => {
   const chars =
@@ -60,15 +81,9 @@ const generatePassword = (): string => {
 };
 
 // Generate company email
-const generateCompanyEmail = (
-  displayName: string,
-  role: "admin" | "user",
-  department?: string,
-): string => {
-  const baseName = displayName.toLowerCase().replace(/\s+/g, ".");
-  const domainPrefix =
-    role === "admin" ? "admin" : department ? department.toLowerCase() : "emp";
-  return `${baseName}@${domainPrefix}.yitro.com`;
+const generateCompanyEmail = (displayName: string): string => {
+  const firstName = displayName.split(' ')[0]?.toLowerCase() || 'user';
+  return `${firstName}@yitro.com`;
 };
 
 // Get all users (admin only)
@@ -104,7 +119,7 @@ router.get("/users", requireAdmin, async (req, res) => {
 // Create new user (admin only) - simplified for SQLite
 router.post("/create-user", requireAdmin, async (req, res) => {
   try {
-    const { email, displayName, password, role, contactNumber, department } = req.body;
+    const { email, displayName, password, role, contactNumber, department, designation } = req.body;
 
     if (!email || !displayName || !role) {
       return res.status(400).json({
@@ -113,46 +128,103 @@ router.post("/create-user", requireAdmin, async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.authUser.findUnique({
-      where: { email },
-    });
+    // Check if user already exists in both tables
+    const [existingAuthUser, existingUserProfile] = await Promise.all([
+      prisma.authUser.findUnique({ where: { email } }),
+      prisma.userProfile.findUnique({ where: { email } })
+    ]);
 
-    if (existingUser) {
+    if (existingAuthUser || existingUserProfile) {
       return res.status(400).json({
         success: false,
         error: "User with this email already exists",
       });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email format",
+      });
+    }
+
     // Generate secure password if not provided
     const userPassword = password || generatePassword();
     
+    // Validate password
+    if (userPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 6 characters long",
+      });
+    }
+
     // Hash password
     const bcrypt = await import('bcryptjs');
     const hashedPassword = await bcrypt.hash(userPassword, 12);
 
-    // Create auth user
-    const newUser = await prisma.authUser.create({
-      data: {
-        email,
-        displayName,
-        passwordHash: hashedPassword,
-        role: role.toLowerCase(),
-        emailVerified: true, // Simplified for SQLite version
-      },
+    // Split display name into first and last name
+    const nameParts = displayName.trim().split(' ');
+    const firstName = nameParts[0] || displayName;
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Create both auth user and user profile in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create auth user
+      const newAuthUser = await tx.authUser.create({
+        data: {
+          email,
+          displayName,
+          passwordHash: hashedPassword,
+          role: role.toLowerCase(),
+          emailVerified: true, // Simplified for SQLite version
+        },
+      });
+
+      // Create user profile
+      const newUserProfile = await tx.userProfile.create({
+        data: {
+          email,
+          firstName,
+          lastName,
+          phone: contactNumber,
+          department,
+          title: designation,
+          role: mapRoleToPrismaEnum(role),
+          emailNotifications: true,
+          smsNotifications: false,
+          pushNotifications: true,
+        },
+      });
+
+      return { authUser: newAuthUser, userProfile: newUserProfile };
     });
+
+    // Try to send welcome email (don't fail user creation if email fails)
+    try {
+      await emailService.sendWelcomeEmail(email, userPassword, generateCompanyEmail(displayName));
+      console.log(`✅ Welcome email sent to ${email}`);
+    } catch (emailError) {
+      console.warn(`⚠️ Failed to send welcome email to ${email}:`, emailError);
+      // Continue without failing the user creation
+    }
 
     res.status(201).json({
       success: true,
       user: {
-        id: newUser.id,
-        email: newUser.email,
-        displayName: newUser.displayName,
-        role: newUser.role?.toUpperCase(),
+        id: result.authUser.id,
+        email: result.authUser.email,
+        displayName: result.authUser.displayName,
+        role: result.authUser.role?.toUpperCase(),
         contactNumber,
         department,
+        designation,
+        emailVerified: result.authUser.emailVerified,
+        createdAt: result.authUser.createdAt,
       },
+      temporaryPassword: userPassword, // Include temp password in response for admin
       message: "User created successfully.",
     });
   } catch (error: any) {
@@ -346,6 +418,123 @@ router.get("/statistics", requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to fetch admin statistics"
+    });
+  }
+});
+
+// Get user-specific statistics (for regular users)
+router.get("/user-statistics", requireAuth, async (req, res) => {
+  try {
+    const { user } = req; // From auth middleware
+    
+    if (!user || !user.email) {
+      return res.status(400).json({
+        success: false,
+        error: "User information not available"
+      });
+    }
+
+    // Get user display name from auth user or user profile
+    let userDisplayName = user.displayName;
+    if (!userDisplayName) {
+      const userProfile = await prisma.userProfile.findUnique({
+        where: { email: user.email },
+        select: { firstName: true, lastName: true }
+      });
+      userDisplayName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : user.email;
+    }
+
+    // Get user-specific data based on owner field
+    const [
+      userContacts,
+      userAccounts,
+      userLeads,
+      userDeals,
+      userActivities,
+      userWonDeals
+    ] = await Promise.all([
+      prisma.contact.count({
+        where: { owner: userDisplayName }
+      }),
+      prisma.account.count({
+        where: { accountOwner: userDisplayName }
+      }),
+      prisma.lead.count({
+        where: { owner: userDisplayName }
+      }),
+      prisma.activeDeal.count({
+        where: { dealOwner: userDisplayName }
+      }),
+      prisma.activityLog.count({
+        where: { createdBy: userDisplayName }
+      }),
+      prisma.activeDeal.count({
+        where: { 
+          dealOwner: userDisplayName,
+          stage: 'ORDER_WON' 
+        }
+      })
+    ]);
+
+    // Calculate user's deal values
+    const userDealStats = await prisma.activeDeal.findMany({
+      select: { dealValue: true, stage: true },
+      where: { 
+        dealOwner: userDisplayName,
+        stage: 'ORDER_WON' 
+      }
+    });
+
+    const userTotalDealValue = userDealStats.reduce((sum, deal) => {
+      const value = parseFloat(deal.dealValue?.replace(/[$,]/g, '') || '0');
+      return sum + value;
+    }, 0);
+
+    // Get user's recent activities
+    const recentActivities = await prisma.activityLog.findMany({
+      take: 5,
+      where: { createdBy: userDisplayName },
+      orderBy: { dateTime: 'desc' },
+      include: {
+        contact: { select: { firstName: true, lastName: true } },
+        account: { select: { accountName: true } }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalContacts: userContacts,
+          totalAccounts: userAccounts,
+          totalLeads: userLeads,
+          totalDeals: userDeals,
+          totalActivities: userActivities,
+          wonDeals: userWonDeals,
+          totalDealValue: userTotalDealValue
+        },
+        recentActivities: recentActivities.map(activity => ({
+          id: activity.id,
+          type: activity.activityType.replace('_', ' '),
+          summary: activity.summary,
+          date: activity.dateTime,
+          contact: activity.contact ? `${activity.contact.firstName} ${activity.contact.lastName}` : null,
+          account: activity.account?.accountName || null,
+          outcome: activity.outcomeDisposition?.replace(/_/g, ' ')
+        })),
+        userInfo: {
+          name: userDisplayName,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Get user statistics error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user statistics"
     });
   }
 });
