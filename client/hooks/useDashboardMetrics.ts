@@ -39,7 +39,7 @@ export function useDashboardMetrics(
           let dealsData = dealsResponse.data;
 
           // Filter deals based on user role
-          if (userRole === "user" && user?.primaryEmail) {
+          if (userRole === "USER" && user?.primaryEmail) {
             dealsData = dealsData.filter(
               (deal) =>
                 deal.dealOwner === user.primaryEmail ||
@@ -81,7 +81,7 @@ export function useDashboardMetrics(
           let leadsData = leadsResponse.data;
 
           // Filter leads based on user role
-          if (userRole === "user" && user?.primaryEmail) {
+          if (userRole === "USER" && user?.primaryEmail) {
             leadsData = leadsData.filter(
               (lead) =>
                 lead.leadOwner === user.primaryEmail ||
