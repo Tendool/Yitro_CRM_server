@@ -60,6 +60,24 @@ export function CRMLeads() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [formData, setFormData] = useState<Partial<Lead>>({});
 
+  // Calculate total value from leads
+  const calculateTotalValue = () => {
+    return leads.reduce((total, lead) => {
+      const value = parseFloat(lead.estimatedValue?.replace(/[^0-9.-]+/g, '') || '0');
+      return total + value;
+    }, 0);
+  };
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(0)}K`;
+    } else {
+      return `$${value.toFixed(0)}`;
+    }
+  };
+
   useEffect(() => {
     const handleTriggerNewItem = (event: CustomEvent) => {
       if (event.detail.type === "leads") {
@@ -419,7 +437,7 @@ export function CRMLeads() {
                   Total Value
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  $280K
+                  {formatCurrency(calculateTotalValue())}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
