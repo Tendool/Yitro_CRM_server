@@ -13,5 +13,5 @@ app.listen(PORT, () => {
   console.log(`📊 Database: SQLite (${process.env.DATABASE_URL || 'dev.db'})`);
   console.log(`🔐 Test accounts:`);
   console.log(`   Admin: admin@yitro.com / admin123`);
-  console.log(`   User: user@yitro.com / admin123`);
+  console.log(`   User: user@yitro.com / user123`);
 });

@@ -74,22 +74,46 @@ export function CRMDashboard({ onSettingsClick }: CRMDashboardProps) {
     return () => clearInterval(cleanupInterval);
   }, []);
 
-  // Calculate metrics directly from CRM context data
+  // Calculate metrics directly from CRM context data - filtered by user ownership
+  const userDeals = deals.filter((deal) => 
+    deal.owner === user?.primaryEmail || 
+    deal.dealOwner === user?.primaryEmail ||
+    deal.createdBy === user?.primaryEmail
+  );
+  
+  const userLeads = leads.filter((lead) => 
+    lead.assignedTo === user?.primaryEmail ||
+    lead.leadOwner === user?.primaryEmail ||
+    lead.createdBy === user?.primaryEmail
+  );
+  
+  const userAccounts = accounts.filter((account) => 
+    account.owner === user?.primaryEmail ||
+    account.accountOwner === user?.primaryEmail ||
+    account.createdBy === user?.primaryEmail
+  );
+  
+  const userContacts = contacts.filter((contact) => 
+    contact.assignedTo === user?.primaryEmail ||
+    contact.owner === user?.primaryEmail ||
+    contact.createdBy === user?.primaryEmail
+  );
+
   const crmMetrics = {
-    totalRevenue: deals
+    totalRevenue: userDeals
       .filter((deal) => deal.stage === "Order Won")
       .reduce((sum, deal) => sum + deal.dealValue, 0),
-    activeDeals: deals.filter(
+    activeDeals: userDeals.filter(
       (deal) => !["Order Won", "Order Lost"].includes(deal.stage),
     ).length,
-    newLeads: leads.filter((lead) => lead.status === "New").length,
-    closedDeals: deals.filter((deal) => deal.stage === "Order Won").length,
-    myAccounts: accounts.length,
-    myContacts: contacts.length,
-    totalLeads: leads.length,
-    totalAccounts: accounts.length,
-    totalContacts: contacts.length,
-    totalDeals: deals.length,
+    newLeads: userLeads.filter((lead) => lead.status === "New").length,
+    closedDeals: userDeals.filter((deal) => deal.stage === "Order Won").length,
+    myAccounts: userAccounts.length,
+    myContacts: userContacts.length,
+    totalLeads: userLeads.length,
+    totalAccounts: userAccounts.length,
+    totalContacts: userContacts.length,
+    totalDeals: userDeals.length,
   };
 
   const handleSettingsClick = () => {
