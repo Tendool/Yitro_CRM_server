@@ -290,6 +290,57 @@ export function createServerSimple(): Express {
     });
   });
 
+  // CRM endpoints returning actual database data
+  app.get("/api/leads", (req, res) => {
+    db.all("SELECT * FROM leads ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch leads" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/contacts", (req, res) => {
+    db.all("SELECT * FROM contacts ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch contacts" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/accounts", (req, res) => {
+    db.all("SELECT * FROM accounts ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch accounts" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/deals", (req, res) => {
+    db.all("SELECT * FROM active_deals ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch deals" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/activities", (req, res) => {
+    db.all("SELECT * FROM activity_logs ORDER BY dateTime DESC", (err, rows) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch activities" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 
