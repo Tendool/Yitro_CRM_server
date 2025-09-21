@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "./RealAuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -51,8 +52,9 @@ import {
 } from "./ui/select";
 
 export function CRMAccounts() {
+  const { user } = useAuth();
   const { accounts, addAccount, updateAccount, deleteAccount } = useCRM();
-  const [filterType, setFilterType] = useState("all");
+  const [filterOwner, setFilterOwner] = useState("all");
   const [showNewAccountDialog, setShowNewAccountDialog] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [formData, setFormData] = useState<Partial<Account>>({});
@@ -196,11 +198,13 @@ export function CRMAccounts() {
   const employeeSizes = ["1-10", "10-50", "50-100", "100-500", "500+", "1000+"];
 
   const filteredAccounts = accounts.filter((account) => {
-    const accountType = (account.type || "").toLowerCase();
-    const matchesFilter =
-      filterType === "all" || accountType === filterType;
-
-    return matchesFilter;
+    if (filterOwner === "all") {
+      return true; // Show all accounts
+    } else if (filterOwner === "own") {
+      // Show only accounts owned by current user
+      return account.owner === user?.email || account.owner === user?.displayName || account.createdBy === user?.email || account.createdBy === user?.displayName;
+    }
+    return true;
   });
 
   return (
@@ -481,21 +485,15 @@ export function CRMAccounts() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
-                  Type: {filterType === "all" ? "All" : filterType}
+                  Data: {filterOwner === "all" ? "All Users" : "My Data"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setFilterType("all")}>
-                  All Types
+                <DropdownMenuItem onClick={() => setFilterOwner("all")}>
+                  All Users Data
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("customer")}>
-                  Customer
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("prospect")}>
-                  Prospect
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType("partner")}>
-                  Partner
+                <DropdownMenuItem onClick={() => setFilterOwner("own")}>
+                  My Data Only
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

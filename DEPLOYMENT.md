@@ -49,7 +49,7 @@ DATABASE_URL="file:./data/production.db"
 NODE_ENV=production
 PORT=3000
 JWT_SECRET="your-jwt-secret-key"
-DOMAIN="https://dealhub.yitrobc.net"
+DOMAIN="http://crm.yitroglobal.com"
 ```
 
 ## Frontend (Built to dist/spa)

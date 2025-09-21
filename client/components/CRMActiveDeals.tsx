@@ -75,7 +75,6 @@ interface ActiveDeal {
 export function CRMActiveDeals() {
   const { user } = useAuth();
   const { deals, addDeal, updateDeal, deleteDeal } = useCRM();
-  const [filterStage, setFilterStage] = useState("all");
   const [filterOwner, setFilterOwner] = useState("all");
   const [loading, setLoading] = useState(false);
   const [showNewDealDialog, setShowNewDealDialog] = useState(false);
@@ -209,25 +208,14 @@ export function CRMActiveDeals() {
   };
 
   const filteredDeals = deals.filter((deal) => {
-    const matchesStage =
-      filterStage === "all" || deal.stage.toLowerCase() === filterStage;
-    const matchesOwner = filterOwner === "all" || deal.ownerId === filterOwner;
-
-    return matchesStage && matchesOwner;
+    if (filterOwner === "all") {
+      return true; // Show all deals
+    } else if (filterOwner === "own") {
+      // Show only deals owned by current user
+      return deal.owner === user?.email || deal.owner === user?.displayName;
+    }
+    return true;
   });
-
-  // Get unique owners for filter dropdown
-  const uniqueOwners = Array.from(
-    new Set(deals.map((deal) => ({ id: deal.ownerId, name: deal.owner }))),
-  ).reduce(
-    (acc, owner) => {
-      if (!acc.find((o) => o.id === owner.id)) {
-        acc.push(owner);
-      }
-      return acc;
-    },
-    [] as { id: string; name: string }[],
-  );
 
   const stages = [
     "Opportunity Identified",
@@ -596,50 +584,18 @@ export function CRMActiveDeals() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
-                  Stage: {filterStage === "all" ? "All" : filterStage}
+                  Data: {filterOwner === "all" ? "All Users" : "My Data"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setFilterStage("all")}>
-                  All Stages
+                <DropdownMenuItem onClick={() => setFilterOwner("all")}>
+                  All Users Data
                 </DropdownMenuItem>
-                {stages.map((stage) => (
-                  <DropdownMenuItem
-                    key={stage}
-                    onClick={() => setFilterStage(stage.toLowerCase())}
-                  >
-                    {stage}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuItem onClick={() => setFilterOwner("own")}>
+                  My Data Only
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {user?.role === "ADMIN" && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <User className="h-4 w-4 mr-2" />
-                    Owner:{" "}
-                    {filterOwner === "all"
-                      ? "All"
-                      : uniqueOwners.find((o) => o.id === filterOwner)?.name}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => setFilterOwner("all")}>
-                    All Owners
-                  </DropdownMenuItem>
-                  {uniqueOwners.map((owner) => (
-                    <DropdownMenuItem
-                      key={owner.id}
-                      onClick={() => setFilterOwner(owner.id)}
-                    >
-                      {owner.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
         </CardContent>
       </Card>
