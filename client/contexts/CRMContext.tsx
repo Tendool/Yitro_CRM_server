@@ -34,6 +34,7 @@ export interface Contact {
   rating: string;
   leadSource: string;
   assignedTo: string;
+  owner: string;        // Add owner for compatibility with metrics
   lastContact: string;
   nextFollowUp: string;
   tags: string[];
@@ -43,8 +44,10 @@ export interface Contact {
 export interface Deal {
   id: number;
   name: string;
+  dealName: string;  // Add dealName for compatibility
   company: string;
-  value: string;
+  value: string;     // Keep for display
+  dealValue: number; // Add dealValue for calculations
   stage: string;
   probability: number;
   closeDate: string;
@@ -167,6 +170,7 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
             rating: 'Cold', // Default rating
             leadSource: contact.source || '',
             assignedTo: contact.owner || '',
+            owner: contact.owner || '',  // Map owner field for metrics
             lastContact: contact.updatedAt ? new Date(contact.updatedAt).toLocaleDateString() : '',
             nextFollowUp: '',
             tags: [],
@@ -178,18 +182,29 @@ export function CRMProvider({ children }: { children: React.ReactNode }) {
         // Load deals
         const dealsResponse = await api.deals.getAll();
         if (dealsResponse.success && dealsResponse.data) {
-          const apiDeals = dealsResponse.data.map(deal => ({
-            ...deal,
-            id: typeof deal.id === 'string' ? parseInt(deal.id) : deal.id,
-            name: deal.dealName || '',
-            company: deal.associatedAccount || '',
-            value: deal.dealValue || '$0',
-            stage: deal.stage || '',
-            probability: deal.probability ? parseInt(deal.probability) : 0,
-            closeDate: deal.closingDate ? new Date(deal.closingDate).toISOString().split('T')[0] : '',
-            owner: deal.dealOwner || '',
-            lastActivity: deal.updatedAt ? new Date(deal.updatedAt).toLocaleDateString() : ''
-          }));
+          const apiDeals = dealsResponse.data.map(deal => {
+            // Parse dealValue from string to number (remove $ and , characters)
+            const dealValueStr = deal.dealValue || '$0';
+            const dealValueNum = parseFloat(dealValueStr.replace(/[$,]/g, '')) || 0;
+            
+            return {
+              ...deal,
+              id: typeof deal.id === 'string' ? parseInt(deal.id) : deal.id,
+              name: deal.dealName || '',
+              dealName: deal.dealName || '',
+              company: deal.associatedAccount || '',
+              value: deal.dealValue || '$0',
+              dealValue: dealValueNum,
+              stage: deal.stage || '',
+              probability: deal.probability ? parseInt(deal.probability.replace('%', '')) : 0,
+              closeDate: deal.closingDate ? new Date(deal.closingDate).toISOString().split('T')[0] : '',
+              owner: deal.dealOwner || '',
+              type: deal.businessLine || '',
+              source: 'Direct',
+              description: deal.description || '',
+              lastActivity: deal.updatedAt ? new Date(deal.updatedAt).toLocaleDateString() : ''
+            };
+          });
           setDeals(apiDeals);
         }
 

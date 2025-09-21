@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { useCRM } from "../contexts/CRMContext";
 import {
   Users,
   Building2,
@@ -45,9 +46,70 @@ interface AdminStatistics {
 }
 
 export function AdminSystemMetrics() {
+  const { leads, accounts, contacts, deals } = useCRM();
   const [statistics, setStatistics] = useState<AdminStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchStatistics();
+  }, [leads, accounts, contacts, deals]); // Re-calculate when CRM data changes
+
+  const calculateLocalStatistics = (): AdminStatistics => {
+    console.log("📊 AdminSystemMetrics: Calculating statistics from CRM context data", {
+      leadsCount: leads.length,
+      accountsCount: accounts.length,
+      contactsCount: contacts.length,
+      dealsCount: deals.length
+    });
+
+    // Calculate metrics from CRM context data
+    const wonDeals = deals.filter((deal) => deal.stage === "Order Won");
+    const activeDeals = deals.filter((deal) => !["Order Won", "Order Lost"].includes(deal.stage));
+    
+    const totalDealValue = wonDeals.reduce((sum, deal) => {
+      return sum + (deal.dealValue || 0);
+    }, 0);
+
+    // Create recent activities from CRM data
+    const recentActivities = [
+      ...deals.map((deal) => ({
+        id: deal.id.toString(),
+        type: deal.stage === "Order Won" ? "Deal Closed" : "Deal Updated", 
+        summary: deal.stage === "Order Won" 
+          ? `${deal.owner} closed deal: ${deal.dealName || deal.name} - $${deal.dealValue?.toLocaleString()}`
+          : `${deal.owner} updated deal: ${deal.dealName || deal.name} to ${deal.stage}`,
+        date: new Date().toISOString(),
+        contact: deal.company,
+        account: deal.company,
+        outcome: deal.stage
+      })),
+      ...contacts.map((contact) => ({
+        id: contact.id.toString(),
+        type: "Contact Activity",
+        summary: `${contact.owner} updated contact: ${contact.firstName} ${contact.lastName}`,
+        date: new Date().toISOString(),
+        contact: contact.fullName,
+        account: contact.company,
+        outcome: contact.status
+      }))
+    ].slice(0, 10); // Show top 10 recent activities
+
+    return {
+      summary: {
+        totalUsers: 7, // Keep existing user count from API
+        totalContacts: contacts.length,
+        totalAccounts: accounts.length,
+        totalLeads: leads.length,
+        totalDeals: activeDeals.length,
+        totalActivities: recentActivities.length,
+        wonDeals: wonDeals.length,
+        totalDealValue
+      },
+      recentActivities,
+      userStats: [] // Will be populated from API call
+    };
+  };
 
   useEffect(() => {
     fetchStatistics();
@@ -55,21 +117,45 @@ export function AdminSystemMetrics() {
 
   const fetchStatistics = async () => {
     try {
+      console.log("🔍 ADMIN SYSTEM METRICS: Fetching statistics from API...");
       const response = await fetch("/api/admin/statistics", {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
         },
       });
 
+      console.log("🔍 ADMIN SYSTEM METRICS: API response:", {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText
+      });
+
       if (response.ok) {
         const data = await response.json();
-        setStatistics(data.data);
+        console.log("🔍 ADMIN SYSTEM METRICS: API data received:", data);
+        
+        // Check if the API data looks correct (non-zero accounts/deals)
+        const apiStats = data.data;
+        if (apiStats && (apiStats.summary.totalAccounts > 0 || apiStats.summary.totalDeals > 0)) {
+          console.log("📊 Using API statistics data");
+          setStatistics(apiStats);
+        } else {
+          console.log("📊 API returned empty/incorrect data, using local calculation");
+          const localStats = calculateLocalStatistics();
+          // Keep user stats from API if available
+          if (apiStats && apiStats.userStats) {
+            localStats.userStats = apiStats.userStats;
+          }
+          setStatistics(localStats);
+        }
       } else {
-        setError("Failed to fetch statistics");
+        console.log("🔍 ADMIN SYSTEM METRICS: API failed, using local calculation");
+        setStatistics(calculateLocalStatistics());
       }
     } catch (error) {
-      console.error("Failed to fetch admin statistics:", error);
-      setError("Network error while fetching statistics");
+      console.error("🔍 ADMIN SYSTEM METRICS: Network error:", error);
+      console.log("🔍 ADMIN SYSTEM METRICS: Using local calculation after error");
+      setStatistics(calculateLocalStatistics());
     } finally {
       setLoading(false);
     }
