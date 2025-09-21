@@ -1,6 +1,8 @@
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:8080",
+  "http://crm.yitroglobal.com",
+  "https://crm.yitroglobal.com",
   "https://dealhub.yitrobc.net",
   "https://www.dealhub.yitrobc.net"
 ];

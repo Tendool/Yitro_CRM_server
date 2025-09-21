@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "./RealAuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -49,8 +50,9 @@ import {
 } from "./ui/select";
 
 export function CRMLeads() {
+  const { user } = useAuth();
   const { leads, addLead, updateLead, deleteLead } = useCRM();
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterOwner, setFilterOwner] = useState("all");
   const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
 
   // Debug logging for dialog state changes
@@ -177,10 +179,13 @@ export function CRMLeads() {
   const sources = ["Website", "Referral", "Cold Call", "LinkedIn", "Event"];
 
   const filteredLeads = leads.filter((lead) => {
-    const matchesFilter =
-      filterStatus === "all" || lead.status.toLowerCase() === filterStatus;
-
-    return matchesFilter;
+    if (filterOwner === "all") {
+      return true; // Show all leads
+    } else if (filterOwner === "own") {
+      // Show only leads assigned to current user
+      return lead.assignedTo === user?.email || lead.assignedTo === user?.displayName;
+    }
+    return true;
   });
 
   return (
@@ -436,24 +441,15 @@ export function CRMLeads() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
-                  Status: {filterStatus === "all" ? "All" : filterStatus}
+                  Data: {filterOwner === "all" ? "All Users" : "My Data"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setFilterStatus("all")}>
-                  All Status
+                <DropdownMenuItem onClick={() => setFilterOwner("all")}>
+                  All Users Data
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterStatus("new")}>
-                  New
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterStatus("qualified")}>
-                  Qualified
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterStatus("working")}>
-                  Working
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterStatus("nurturing")}>
-                  Nurturing
+                <DropdownMenuItem onClick={() => setFilterOwner("own")}>
+                  My Data Only
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

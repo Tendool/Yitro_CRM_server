@@ -54,7 +54,6 @@ export function CRMContacts() {
   console.log("CRMContacts component loaded");
   const { user } = useAuth();
   const { contacts, addContact, updateContact, deleteContact } = useCRM();
-  const [filterStatus, setFilterStatus] = useState("all");
   const [filterOwner, setFilterOwner] = useState("all");
   const [loading, setLoading] = useState(false);
   const [showNewContactDialog, setShowNewContactDialog] = useState(false);
@@ -168,28 +167,14 @@ export function CRMContacts() {
   };
 
   const filteredContacts = contacts.filter((contact) => {
-    const matchesStatus =
-      filterStatus === "all" || contact.status?.toLowerCase() === filterStatus;
-    const matchesOwner =
-      filterOwner === "all" || contact.ownerId === filterOwner;
-
-    return matchesStatus && matchesOwner;
+    if (filterOwner === "all") {
+      return true; // Show all contacts
+    } else if (filterOwner === "own") {
+      // Show only contacts owned by current user
+      return contact.owner === user?.email || contact.owner === user?.displayName || contact.assignedTo === user?.email || contact.assignedTo === user?.displayName;
+    }
+    return true;
   });
-
-  // Get unique owners for filter dropdown
-  const uniqueOwners = Array.from(
-    new Set(
-      contacts.map((contact) => ({ id: contact.ownerId, name: contact.owner })),
-    ),
-  ).reduce(
-    (acc, owner) => {
-      if (!acc.find((o) => o.id === owner.id)) {
-        acc.push(owner);
-      }
-      return acc;
-    },
-    [] as { id: string; name: string }[],
-  );
 
   const statuses = ["Suspect", "Prospect", "Active Deal", "Do Not Call"];
   const sources = ["Data Research", "Referral", "Event"];
@@ -504,50 +489,18 @@ export function CRMContacts() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
-                  Status: {filterStatus === "all" ? "All" : filterStatus}
+                  Data: {filterOwner === "all" ? "All Users" : "My Data"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setFilterStatus("all")}>
-                  All Statuses
+                <DropdownMenuItem onClick={() => setFilterOwner("all")}>
+                  All Users Data
                 </DropdownMenuItem>
-                {statuses.map((status) => (
-                  <DropdownMenuItem
-                    key={status}
-                    onClick={() => setFilterStatus(status.toLowerCase())}
-                  >
-                    {status}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuItem onClick={() => setFilterOwner("own")}>
+                  My Data Only
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {user?.role === "ADMIN" && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <User className="h-4 w-4 mr-2" />
-                    Owner:{" "}
-                    {filterOwner === "all"
-                      ? "All"
-                      : uniqueOwners.find((o) => o.id === filterOwner)?.name}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => setFilterOwner("all")}>
-                    All Owners
-                  </DropdownMenuItem>
-                  {uniqueOwners.map((owner) => (
-                    <DropdownMenuItem
-                      key={owner.id}
-                      onClick={() => setFilterOwner(owner.id)}
-                    >
-                      {owner.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
         </CardContent>
       </Card>
