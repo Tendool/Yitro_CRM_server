@@ -39,6 +39,17 @@ export function AdminMetrics() {
   const { leads, accounts, contacts, deals } = useCRM();
   const [loading, setLoading] = useState(false); // No need to load from API
 
+  console.log("🔍 ADMIN METRICS DEBUG:", {
+    leadsCount: leads.length,
+    accountsCount: accounts.length, 
+    contactsCount: contacts.length,
+    dealsCount: deals.length,
+    firstLead: leads[0],
+    firstAccount: accounts[0],
+    firstContact: contacts[0],
+    firstDeal: deals[0]
+  });
+
   // Calculate comprehensive real-time metrics from CRM data
   const wonDealsData = deals.filter((deal) => deal.stage === "Order Won");
   const activeDealsData = deals.filter(

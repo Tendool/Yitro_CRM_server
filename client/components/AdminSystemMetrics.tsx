@@ -55,24 +55,42 @@ export function AdminSystemMetrics() {
 
   const fetchStatistics = async () => {
     try {
+      console.log("🔍 ADMIN SYSTEM METRICS: Fetching statistics from API...");
       const response = await fetch("/api/admin/statistics", {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
         },
       });
 
+      console.log("🔍 ADMIN SYSTEM METRICS: API response:", {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText
+      });
+
       if (response.ok) {
         const data = await response.json();
+        console.log("🔍 ADMIN SYSTEM METRICS: API data received:", data);
         setStatistics(data.data);
       } else {
-        setError("Failed to fetch statistics");
+        console.log("🔍 ADMIN SYSTEM METRICS: API failed, trying fallback...");
+        // Try fallback to local calculations
+        await fetchFallbackStatistics();
       }
     } catch (error) {
-      console.error("Failed to fetch admin statistics:", error);
-      setError("Network error while fetching statistics");
+      console.error("🔍 ADMIN SYSTEM METRICS: Network error:", error);
+      console.log("🔍 ADMIN SYSTEM METRICS: Trying fallback after error...");
+      // Try fallback to local calculations
+      await fetchFallbackStatistics();
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchFallbackStatistics = async () => {
+    console.log("🔍 ADMIN SYSTEM METRICS: Using fallback statistics calculation...");
+    // TODO: Add fallback logic here using CRM context data
+    setError("Using fallback data - API not available");
   };
 
   const formatCurrency = (value: number) => {
