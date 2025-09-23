@@ -141,6 +141,57 @@ export function createServerSimple(): Express {
     }
   });
 
+  // Delete user endpoint
+  app.delete("/api/admin/users/:id", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+
+    const { id } = req.params;
+    console.log("🗑️ DELETE route reached for user ID:", id);
+
+    // Check if user exists and prevent deletion of system admin
+    db.get("SELECT email FROM auth_users WHERE id = ?", [id], (err, user: any) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Database error" });
+      }
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      // Prevent deletion of system admin
+      if (user.email === "admin@yitro.com") {
+        return res.status(403).json({
+          success: false,
+          error: "Cannot delete system administrator",
+        });
+      }
+
+      // Delete the user
+      db.run("DELETE FROM auth_users WHERE id = ?", [id], function(err) {
+        if (err) {
+          console.error("Delete user error:", err);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to delete user",
+          });
+        }
+
+        console.log("✅ User deleted successfully:", id);
+        res.json({
+          success: true,
+          message: "User deleted successfully",
+        });
+      });
+    });
+  });
+
   // Admin statistics endpoint
   app.get("/api/admin/statistics", async (req, res) => {
     const authHeader = req.headers["authorization"];
