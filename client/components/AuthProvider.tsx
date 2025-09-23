@@ -46,21 +46,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     // Check for existing session
-    const checkSession = () => {
+    const checkSession = async () => {
       const storedUser = localStorage.getItem("crm_user");
-      if (storedUser) {
+      const storedToken = localStorage.getItem("auth_token");
+      
+      if (storedUser && storedToken) {
         try {
           const userData = JSON.parse(storedUser);
+          
           // Clear old yutro domain sessions
           if (userData.email && userData.email.includes("yutro.com")) {
             localStorage.removeItem("crm_user");
+            localStorage.removeItem("auth_token");
             setLoading(false);
             return;
           }
-          setUser(userData);
+          
+          // Validate token with backend
+          try {
+            const response = await fetch("/api/auth/validate", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${storedToken}`,
+              },
+            });
+            
+            if (response.ok) {
+              console.log("✅ Token validated, user session restored");
+              setUser(userData);
+            } else {
+              console.log("❌ Token invalid, clearing session");
+              localStorage.removeItem("crm_user");
+              localStorage.removeItem("auth_token");
+            }
+          } catch (error) {
+            console.log("❌ Token validation failed, using stored user data anyway");
+            // If validation endpoint doesn't exist, trust stored data for now
+            setUser(userData);
+          }
         } catch (error) {
           console.error("Error parsing stored user:", error);
           localStorage.removeItem("crm_user");
+          localStorage.removeItem("auth_token");
         }
       }
       setLoading(false);
@@ -78,23 +106,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     try {
-      // For demo purposes, accept any email/password combination
-      // In production, this would validate against Neon Auth
-      const role = determineUserRole(email);
+      console.log("🔐 Attempting signin with backend API for:", email);
+      
+      const response = await fetch("/api/auth/signin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      const userData: User = {
-        id: `user_${Date.now()}`,
-        email,
-        primaryEmail: email,
-        displayName: email.split("@")[0],
-        role,
-      };
+      if (response.ok) {
+        const data = await response.json();
+        console.log("✅ Backend signin successful:", data);
+        
+        if (data.success && data.data?.user && data.data?.token) {
+          const userData: User = {
+            id: data.data.user.id,
+            email: data.data.user.email,
+            primaryEmail: data.data.user.email,
+            displayName: data.data.user.displayName,
+            role: data.data.user.role.toUpperCase(),
+          };
 
-      setUser(userData);
-      localStorage.setItem("crm_user", JSON.stringify(userData));
-      return true;
+          setUser(userData);
+          localStorage.setItem("crm_user", JSON.stringify(userData));
+          localStorage.setItem("auth_token", data.data.token);
+          console.log("✅ User data saved to localStorage");
+          return true;
+        }
+      } else {
+        console.error("❌ Backend signin failed:", response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("❌ Error details:", errorData);
+      }
+      
+      return false;
     } catch (error) {
-      console.error("Sign in error:", error);
+      console.error("❌ Sign in error:", error);
       return false;
     }
   };
@@ -105,23 +154,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
     displayName: string,
   ): Promise<boolean> => {
     try {
-      // For demo purposes, create user immediately
-      // In production, this would create user via Neon Auth
-      const role = determineUserRole(email);
+      console.log("📝 Attempting signup with backend API for:", email);
+      
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password, displayName }),
+      });
 
-      const userData: User = {
-        id: `user_${Date.now()}`,
-        email,
-        primaryEmail: email,
-        displayName: displayName || email.split("@")[0],
-        role,
-      };
+      if (response.ok) {
+        const data = await response.json();
+        console.log("✅ Backend signup successful:", data);
+        
+        if (data.success && data.data?.user && data.data?.token) {
+          const userData: User = {
+            id: data.data.user.id,
+            email: data.data.user.email,
+            primaryEmail: data.data.user.email,
+            displayName: data.data.user.displayName,
+            role: data.data.user.role.toUpperCase(),
+          };
 
-      setUser(userData);
-      localStorage.setItem("crm_user", JSON.stringify(userData));
-      return true;
+          setUser(userData);
+          localStorage.setItem("crm_user", JSON.stringify(userData));
+          localStorage.setItem("auth_token", data.data.token);
+          console.log("✅ User data saved to localStorage after signup");
+          return true;
+        }
+      } else {
+        console.error("❌ Backend signup failed:", response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("❌ Error details:", errorData);
+      }
+      
+      return false;
     } catch (error) {
-      console.error("Sign up error:", error);
+      console.error("❌ Sign up error:", error);
       return false;
     }
   };
@@ -129,6 +199,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = () => {
     setUser(null);
     localStorage.removeItem("crm_user");
+    localStorage.removeItem("auth_token");
+    console.log("🚪 User signed out, tokens cleared");
   };
 
   const value: AuthContextType = {
