@@ -38,6 +38,21 @@ if (args.includes('dev') || args.includes('development')) {
   // Load environment variables before importing the application
   import('dotenv').then(({ config }) => {
     config();
-    import("./dist/server/node-build.mjs");
+    
+    // Set production-specific environment variables
+    process.env.NODE_ENV = 'production';
+    
+    // Import and start the server
+    import("./dist/server/node-build.mjs").then(() => {
+      console.log('✅ Production server started successfully');
+      console.log(`🌐 Server running on port ${process.env.PORT || 3000}`);
+      console.log(`🔗 Database: ${process.env.DATABASE_URL || 'SQLite'}`);
+    }).catch((error) => {
+      console.error('❌ Failed to start production server:', error);
+      process.exit(1);
+    });
+  }).catch((error) => {
+    console.error('❌ Failed to load environment configuration:', error);
+    process.exit(1);
   });
 }
