@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { prisma } from "./prisma.js";
 import { dbFallback } from "./database-fallback.js";
+import { authLogger, dbLogger } from "./logger.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key";
 
@@ -226,6 +227,7 @@ export class AuthService {
     data: SignInRequest,
   ): Promise<{ user: User; token: string }> {
     try {
+      authLogger.info("SignIn attempt started", { email: data.email });
       console.log('🔐 Attempting signin for:', data.email);
 
       // First, try to find user in AuthUser table (where admin creates users)
@@ -236,6 +238,13 @@ export class AuthService {
       // Fallback to UserProfile for backward compatibility
       let userRecord = await prisma.userProfile.findUnique({
         where: { email: data.email },
+      });
+
+      authLogger.debug("User lookup results", {
+        email: data.email,
+        foundInAuthUser: !!authUser,
+        foundInUserProfile: !!userRecord,
+        authUserEmailVerified: authUser?.emailVerified
       });
 
       // Check if this is admin email for demo
@@ -250,10 +259,12 @@ export class AuthService {
       // For admin accounts, always validate password regardless of user existence
       if (isAdminEmail) {
         if (!isValidPassword) {
+          authLogger.warn("Invalid password for admin account", { email: data.email });
           console.log('❌ Invalid password for admin account:', data.email);
           throw new Error('Invalid email or password');
         }
         
+        authLogger.info("Admin account access granted", { email: data.email });
         console.log('✅ Admin account access granted');
         
         // If user doesn't exist in UserProfile, create them for compatibility
@@ -270,6 +281,7 @@ export class AuthService {
               pushNotifications: true,
             },
           });
+          authLogger.info("Created new admin user profile", { email: data.email, userId: userRecord.id });
           console.log('✅ Created new admin user profile');
         }
       } else if (authUser) {
@@ -278,10 +290,12 @@ export class AuthService {
         const isPasswordValid = await bcrypt.compare(data.password, authUser.passwordHash);
         
         if (!isPasswordValid) {
+          authLogger.warn("Invalid password for auth user", { email: data.email, userId: authUser.id });
           console.log('❌ Invalid password for user:', data.email);
           throw new Error('Invalid email or password');
         }
         
+        authLogger.info("AuthUser found and password validated", { email: data.email, userId: authUser.id });
         console.log('✅ AuthUser found, password validated');
         
         // Create corresponding UserProfile if it doesn't exist for compatibility
@@ -298,17 +312,21 @@ export class AuthService {
               pushNotifications: true,
             },
           });
+          authLogger.info("Created UserProfile for AuthUser", { email: authUser.email, userId: userRecord.id });
           console.log('✅ Created UserProfile for AuthUser');
         }
       } else if (userRecord) {
         // For existing non-admin users in UserProfile, just allow them through for demo
+        authLogger.info("Existing UserProfile found, allowing access (demo mode)", { email: data.email, userId: userRecord.id });
         console.log('✅ Existing UserProfile found, allowing access (demo mode)');
       } else {
+        authLogger.warn("Invalid credentials - user not found", { email: data.email });
         console.log('❌ Invalid credentials for:', data.email);
         throw new Error('Invalid email or password');
       }
 
       if (!userRecord) {
+        authLogger.error("User record not found after validation", { email: data.email });
         throw new Error('User not found');
       }
 
@@ -323,10 +341,12 @@ export class AuthService {
       };
 
       const token = this.generateToken(user);
+      authLogger.auth("signin", data.email, true, { userId: user.id, role: user.role });
       console.log('✅ Signin successful for:', data.email);
 
       return { user, token };
     } catch (error) {
+      authLogger.error("SignIn failed", error as Error, { email: data.email });
       console.error("❌ SignIn error:", error);
       throw error;
     }

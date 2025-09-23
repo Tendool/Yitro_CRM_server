@@ -6,16 +6,27 @@ import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
 import { initializeDatabase } from "./db/init-db";
 import { setupTestAccounts } from "./db/setup-test-accounts";
+import { logger } from "./lib/logger.js";
+import { httpLoggingMiddleware, addUserContextToLogs, errorLoggingMiddleware } from "./lib/httpLogging.js";
 
 export function createServer(): Express {
   const app = express();
+
+  logger.info("Starting Yitro CRM Server", {
+    nodeEnv: process.env.NODE_ENV,
+    port: process.env.PORT,
+    databaseUrl: process.env.DATABASE_URL ? "configured" : "not configured"
+  });
 
   // Middleware
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Debug middleware
+  // Add structured HTTP logging
+  app.use(httpLoggingMiddleware);
+
+  // Debug middleware (deprecated - replaced by structured logging)
   app.use((req, res, next) => {
     if (req.url.startsWith("/api/")) {
       console.log(`API Request: ${req.method} ${req.url}`);
@@ -25,8 +36,14 @@ export function createServer(): Express {
     next();
   });
 
+  // Add user context to logs after authentication
+  app.use(addUserContextToLogs);
+
   // Initialize sample data in SQLite database
   crmRoutes.initializeSampleData().catch((error) => {
+    logger.error("Failed to initialize SQLite database", error, {
+      databaseUrl: process.env.DATABASE_URL
+    });
     console.error("❌ Failed to initialize SQLite database:", error);
     console.log("🔧 Please check DATABASE_URL and database file permissions");
   });
@@ -34,10 +51,17 @@ export function createServer(): Express {
   // Initialize authentication database
   initializeDatabase()
     .then(() => {
+      logger.info("Authentication database initialized successfully");
       // Setup test accounts after database is ready
-      setupTestAccounts().catch(console.error);
+      setupTestAccounts().catch((error) => {
+        logger.error("Failed to setup test accounts", error);
+        console.error(error);
+      });
     })
-    .catch(console.error);
+    .catch((error) => {
+      logger.error("Failed to initialize authentication database", error);
+      console.error(error);
+    });
 
   // Auth API Routes
   app.use("/api/auth", authRoutes);
@@ -92,10 +116,16 @@ export function createServer(): Express {
 
   // Existing routes
   app.get("/api/ping", (req, res) => {
+    logger.info("Ping endpoint accessed");
     res.json({ message: "pong" });
   });
 
   // Demo route removed - using only SQLite database
+
+  // Add error logging middleware at the end
+  app.use(errorLoggingMiddleware);
+
+  logger.info("Yitro CRM Server setup completed");
 
   return app;
 }

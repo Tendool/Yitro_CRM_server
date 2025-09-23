@@ -204,13 +204,63 @@ npm run start:production
 
 ### Application Logs
 
+The Yitro CRM server now includes structured logging with different log levels:
+
 ```bash
-# PM2 logs
+# PM2 logs (includes structured JSON logs)
 pm2 logs dealhub-crm
 
 # System logs
 tail -f /var/log/dealhub/combined.log
+
+# View structured logs in JSON format
+pm2 logs dealhub-crm --json
+
+# Filter logs by level
+pm2 logs dealhub-crm | grep '"level":"ERROR"'
 ```
+
+### Log Configuration
+
+Set the log level using environment variables:
+
+```env
+# Available levels: DEBUG, INFO, WARN, ERROR
+LOG_LEVEL=INFO
+```
+
+**Log Levels:**
+- `DEBUG`: Detailed debugging information (includes database operations)
+- `INFO`: General application events (default for production)
+- `WARN`: Warning conditions that don't stop operation
+- `ERROR`: Error conditions that may affect functionality
+
+### Log Structure
+
+All logs are output in JSON format for easy parsing:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "level": "INFO",
+  "message": "User signed in successfully",
+  "context": "AUTH",
+  "metadata": {
+    "email": "us***@example.com",
+    "userId": "user-123",
+    "duration": 45
+  }
+}
+```
+
+### Authentication Logging
+
+The application logs all authentication events:
+- Sign-in attempts (successful and failed)
+- User creation by admin
+- Password validation
+- Session management
+- Email notifications
 
 ### System Monitoring
 
