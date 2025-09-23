@@ -437,22 +437,14 @@ export function CRMLeads() {
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Data: {filterOwner === "all" ? "All Users" : "My Data"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setFilterOwner("all")}>
-                  All Users Data
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterOwner("own")}>
-                  My Data Only
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button 
+              variant="outline" 
+              onClick={() => setFilterOwner(filterOwner === "all" ? "own" : "all")}
+              className="min-w-[140px]"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Data: {filterOwner === "all" ? "All Users" : "My Data"}
+            </Button>
           </div>
         </CardContent>
       </Card>
