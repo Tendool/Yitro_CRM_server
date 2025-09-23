@@ -141,6 +141,63 @@ export function createServerSimple(): Express {
     }
   });
 
+  // Delete user endpoint
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+
+    try {
+      const { id } = req.params;
+
+      // Check if user exists
+      const checkUserQuery = "SELECT id, email FROM auth_users WHERE id = ?";
+      
+      db.get(checkUserQuery, [id], (err, existingUser: any) => {
+        if (err) {
+          console.error("Database error:", err);
+          return res.status(500).json({ success: false, error: "Database error" });
+        }
+
+        if (!existingUser) {
+          return res.status(404).json({
+            success: false,
+            error: "User not found",
+          });
+        }
+
+        // Prevent deletion of system admin
+        if (existingUser.email === "admin@yitro.com") {
+          return res.status(403).json({
+            success: false,
+            error: "Cannot delete system administrator",
+          });
+        }
+
+        // Delete the user
+        const deleteQuery = "DELETE FROM auth_users WHERE id = ?";
+        db.run(deleteQuery, [id], function(err) {
+          if (err) {
+            console.error("Database error:", err);
+            return res.status(500).json({ success: false, error: "Failed to delete user" });
+          }
+
+          res.json({
+            success: true,
+            message: "User deleted successfully",
+          });
+        });
+      });
+    } catch (error: any) {
+      console.error("Delete user error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to delete user",
+      });
+    }
+  });
+
   // Admin statistics endpoint
   app.get("/api/admin/statistics", async (req, res) => {
     const authHeader = req.headers["authorization"];
@@ -269,6 +326,175 @@ export function createServerSimple(): Express {
         });
       });
     }
+  });
+
+  // Basic CRM Accounts routes for frontend compatibility
+  app.get("/api/accounts", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    db.all("SELECT * FROM accounts ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Database error:", err);
+        // Return empty array if table doesn't exist
+        return res.json({ success: true, data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } });
+      }
+      
+      res.json({ 
+        success: true, 
+        data: rows || [], 
+        pagination: { page: 1, limit: 10, total: (rows || []).length, totalPages: 1 }
+      });
+    });
+  });
+
+  app.get("/api/accounts/:id", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    db.get("SELECT * FROM accounts WHERE id = ?", [req.params.id], (err, row) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch account" });
+      }
+      
+      if (!row) {
+        return res.status(404).json({ success: false, error: "Account not found" });
+      }
+      
+      res.json({ success: true, data: row });
+    });
+  });
+
+  app.post("/api/accounts", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    const { name, accountName, industry, type, revenue, employees, location, phone, website, owner, rating } = req.body;
+    
+    if (!accountName && !name) {
+      return res.status(400).json({ success: false, error: "Account name is required" });
+    }
+    
+    const finalAccountName = accountName || name;
+    const accountId = Date.now().toString();
+    const now = new Date().toISOString();
+    
+    const insertQuery = `
+      INSERT INTO accounts (id, accountName, accountRating, accountOwner, industry, revenue, numberOfEmployees, website, createdAt, updatedAt, createdBy, updatedBy)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    db.run(insertQuery, [
+      accountId,
+      finalAccountName,
+      rating || "Cold",
+      owner || "Current User",
+      industry || "Technology",
+      revenue || "$0",
+      employees || "1-10",
+      website || "",
+      now,
+      now,
+      "system",
+      "system"
+    ], function(err) {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to create account" });
+      }
+      
+      res.status(201).json({
+        success: true,
+        data: {
+          id: accountId,
+          name: finalAccountName,
+          accountName: finalAccountName,
+          industry: industry || "Technology",
+          type: type || "Customer",
+          revenue: revenue || "$0",
+          employees: employees || "1-10",
+          location: location || "",
+          phone: phone || "",
+          website: website || "",
+          owner: owner || "Current User",
+          rating: rating || "Cold",
+          lastActivity: "Just now",
+          activeDeals: 0,
+          contacts: 0,
+          createdAt: now,
+          updatedAt: now
+        }
+      });
+    });
+  });
+
+  app.put("/api/accounts/:id", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    const { name, accountName, industry, type, revenue, employees, location, phone, website, owner, rating } = req.body;
+    const now = new Date().toISOString();
+    const finalAccountName = accountName || name;
+    
+    const updateQuery = `
+      UPDATE accounts SET 
+        accountName = ?, accountRating = ?, accountOwner = ?, industry = ?, 
+        revenue = ?, numberOfEmployees = ?, website = ?, updatedAt = ?, updatedBy = ?
+      WHERE id = ?
+    `;
+    
+    db.run(updateQuery, [
+      finalAccountName,
+      rating,
+      owner,
+      industry,
+      revenue,
+      employees,
+      website,
+      now,
+      "system",
+      req.params.id
+    ], function(err) {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to update account" });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ success: false, error: "Account not found" });
+      }
+      
+      res.json({ success: true, message: "Account updated successfully" });
+    });
+  });
+
+  app.delete("/api/accounts/:id", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+    
+    db.run("DELETE FROM accounts WHERE id = ?", [req.params.id], function(err) {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Failed to delete account" });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ success: false, error: "Account not found" });
+      }
+      
+      res.json({ success: true, message: "Account deleted successfully" });
+    });
   });
 
   // Generate secure password helper
