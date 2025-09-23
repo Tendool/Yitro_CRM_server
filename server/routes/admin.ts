@@ -3,6 +3,7 @@ import express from "express";
 import { authService } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";
 import { prisma } from "../lib/prisma.js";
+import { logger } from "../lib/logger.js";
 
 const router = express.Router();
 
@@ -132,30 +133,59 @@ router.post("/create-user", requireAdmin, async (req, res) => {
     const bcrypt = await import('bcryptjs');
     const hashedPassword = await bcrypt.hash(userPassword, 12);
 
-    // Create auth user
-    const newUser = await prisma.authUser.create({
-      data: {
-        email,
-        displayName,
-        passwordHash: hashedPassword,
-        role: role.toLowerCase(),
-        emailVerified: true, // Simplified for SQLite version
-      },
+    logger.info("Creating new user", { email, displayName, role });
+
+    // Use transaction to create both AuthUser and UserProfile atomically
+    const result = await prisma.$transaction(async (tx) => {
+      // Create auth user
+      const newAuthUser = await tx.authUser.create({
+        data: {
+          email,
+          displayName,
+          passwordHash: hashedPassword,
+          role: role.toLowerCase(),
+          emailVerified: true,
+        },
+      });
+
+      // Create corresponding UserProfile for compatibility
+      const [firstName, ...lastNameParts] = displayName.split(' ');
+      const newUserProfile = await tx.userProfile.create({
+        data: {
+          email,
+          firstName: firstName || displayName,
+          lastName: lastNameParts.join(' ') || '',
+          role: mapRoleToPrismaEnum(role),
+          emailNotifications: true,
+          smsNotifications: false,
+          pushNotifications: true,
+        },
+      });
+
+      return { authUser: newAuthUser, userProfile: newUserProfile };
+    });
+
+    logger.info("User created successfully", { 
+      email, 
+      authUserId: result.authUser.id,
+      userProfileId: result.userProfile.id,
+      role: result.authUser.role 
     });
 
     res.status(201).json({
       success: true,
       user: {
-        id: newUser.id,
-        email: newUser.email,
-        displayName: newUser.displayName,
-        role: newUser.role?.toUpperCase(),
+        id: result.authUser.id,
+        email: result.authUser.email,
+        displayName: result.authUser.displayName,
+        role: result.authUser.role?.toUpperCase(),
         contactNumber,
         department,
       },
       message: "User created successfully.",
     });
   } catch (error: any) {
+    logger.error("Create user failed", error, { email, displayName, role });
     console.error("Create user error:", error);
     res.status(400).json({
       success: false,

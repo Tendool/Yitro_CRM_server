@@ -4,6 +4,7 @@ import { authService, User } from "../lib/auth.js";
 import { emailService } from "../lib/emailService.js";
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import { authLogger } from "../lib/logger.js";
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -97,12 +98,14 @@ router.post("/signin", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
+      authLogger.warn("Signin attempt with missing credentials", { email });
       return res.status(400).json({
         success: false,
         error: "Email and password are required",
       });
     }
 
+    authLogger.info("Signin attempt started", { email });
     console.log('🔐 Signin attempt for:', email);
 
     const result = await authService.signIn({ email, password });
@@ -119,8 +122,10 @@ router.post("/signin", async (req, res) => {
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         }
       });
+      authLogger.info("Session created successfully", { userId: result.user.id, email: result.user.email });
       console.log('✅ Session created for user:', result.user.email);
     } catch (sessionError) {
+      authLogger.warn("Session creation failed", sessionError as Error, { userId: result.user.id });
       console.log('ℹ️ Session creation skipped (non-critical):', sessionError.message);
     }
 
@@ -136,11 +141,14 @@ router.post("/signin", async (req, res) => {
         result.user.displayName,
         loginDetails,
       );
+      authLogger.info("Login notification sent", { email });
       console.log('📧 Login notification sent');
     } catch (emailError) {
+      authLogger.warn("Login notification failed", emailError as Error, { email });
       console.log('ℹ️ Login notification skipped (email service unavailable)');
     }
 
+    authLogger.auth("signin", email, true, { userId: result.user.id, role: result.user.role });
     console.log('✅ Signin successful for:', email);
 
     res.json({
@@ -152,6 +160,7 @@ router.post("/signin", async (req, res) => {
       },
     });
   } catch (error: any) {
+    authLogger.error("Signin failed", error, { email });
     console.error("❌ Signin error:", error);
     res.status(401).json({
       success: false,
