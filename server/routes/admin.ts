@@ -182,7 +182,11 @@ router.post("/create-user", requireAdmin, async (req, res) => {
         contactNumber,
         department,
       },
-      message: "User created successfully.",
+      // Return the password only if it was auto-generated (not user-provided)
+      ...(password ? {} : { temporaryPassword: userPassword }),
+      message: password 
+        ? "User created successfully with provided password."
+        : `User created successfully. Temporary password: ${userPassword}`,
     });
   } catch (error: any) {
     logger.error("Create user failed", error, { email, displayName, role });

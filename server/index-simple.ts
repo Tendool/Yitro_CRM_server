@@ -128,7 +128,11 @@ export function createServerSimple(): Express {
               contactNumber,
               department,
             },
-            message: "User created successfully.",
+            // Return the password only if it was auto-generated (not user-provided)
+            ...(password ? {} : { temporaryPassword: userPassword }),
+            message: password 
+              ? "User created successfully with provided password."
+              : `User created successfully. Temporary password: ${userPassword}`,
           });
         });
       });
