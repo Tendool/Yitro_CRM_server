@@ -27,3 +27,21 @@ dist-ssr
 !.env
 
 /generated/prisma
+
+# Production environment files
+.env.production
+.env.backup
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# AWS deployment artifacts
+*.backup.*
+backups/
+deployment-logs/
+
+# Temporary files
+tmp/
+temp/
