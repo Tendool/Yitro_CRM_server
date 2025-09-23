@@ -168,6 +168,7 @@ router.post("/create-user", requireAdmin, async (req, res) => {
 router.delete("/users/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log("🗑️ DELETE route reached for user ID:", id);
 
     // Check if user exists
     const user = await prisma.authUser.findUnique({

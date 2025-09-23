@@ -141,6 +141,57 @@ export function createServerSimple(): Express {
     }
   });
 
+  // Delete user endpoint
+  app.delete("/api/admin/users/:id", (req, res) => {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Authorization required" });
+    }
+
+    const { id } = req.params;
+    console.log("🗑️ DELETE route reached for user ID:", id);
+
+    // Check if user exists and prevent deletion of system admin
+    db.get("SELECT email FROM auth_users WHERE id = ?", [id], (err, user: any) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, error: "Database error" });
+      }
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      // Prevent deletion of system admin
+      if (user.email === "admin@yitro.com") {
+        return res.status(403).json({
+          success: false,
+          error: "Cannot delete system administrator",
+        });
+      }
+
+      // Delete the user
+      db.run("DELETE FROM auth_users WHERE id = ?", [id], function(err) {
+        if (err) {
+          console.error("Delete user error:", err);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to delete user",
+          });
+        }
+
+        console.log("✅ User deleted successfully:", id);
+        res.json({
+          success: true,
+          message: "User deleted successfully",
+        });
+      });
+    });
+  });
+
   // Admin statistics endpoint
   app.get("/api/admin/statistics", async (req, res) => {
     const authHeader = req.headers["authorization"];
@@ -297,6 +348,57 @@ export function createServerSimple(): Express {
       version: "1.0.0",
       database: "sqlite",
       timestamp: new Date().toISOString()
+    });
+  });
+
+  // Simple CRM endpoints for real data
+  app.get("/api/leads", (req, res) => {
+    db.all("SELECT * FROM leads ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Error fetching leads:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch leads" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/accounts", (req, res) => {
+    db.all("SELECT * FROM accounts ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Error fetching accounts:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch accounts" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/contacts", (req, res) => {
+    db.all("SELECT * FROM contacts ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Error fetching contacts:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch contacts" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/deals", (req, res) => {
+    db.all("SELECT * FROM active_deals ORDER BY createdAt DESC", (err, rows) => {
+      if (err) {
+        console.error("Error fetching deals:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch deals" });
+      }
+      res.json({ success: true, data: rows || [] });
+    });
+  });
+
+  app.get("/api/activities", (req, res) => {
+    db.all("SELECT * FROM activity_logs ORDER BY dateTime DESC LIMIT 50", (err, rows) => {
+      if (err) {
+        console.error("Error fetching activities:", err);
+        return res.status(500).json({ success: false, error: "Failed to fetch activities" });
+      }
+      res.json({ success: true, data: rows || [] });
     });
   });
 
