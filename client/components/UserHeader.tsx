@@ -129,7 +129,7 @@ export function UserHeader({
             <DropdownMenuTrigger asChild>
               <div className="flex items-center space-x-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg p-2 transition-colors">
                 <Avatar className="h-8 w-8 border border-gray-200 dark:border-gray-700">
-                  <AvatarFallback className="bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 text-sm font-medium">
+                  <AvatarFallback className="bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-100 text-sm font-medium">
                     {user?.displayName?.charAt(0).toUpperCase() ||
                       user?.email?.charAt(0).toUpperCase() ||
                       "U"}
@@ -153,7 +153,7 @@ export function UserHeader({
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   {user?.email || "user@yitro.com"}
                 </p>
-                <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full mt-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full mt-1 bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                   <User className="w-3 h-3 inline mr-1" />
                   Team Member
                 </span>
