@@ -113,12 +113,41 @@ export function UserSettings({ onBack }: UserSettingsProps) {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // For now, just show a success message
-        // In a real app, you would upload the file to a server
-        setMessage({
-          type: "success",
-          text: "Photo uploaded successfully! (Feature in development)",
-        });
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          setMessage({
+            type: "error",
+            text: "Please select a valid image file",
+          });
+          return;
+        }
+        
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          setMessage({
+            type: "error",
+            text: "File size must be less than 5MB",
+          });
+          return;
+        }
+        
+        // Read the file to validate it can be processed
+        const reader = new FileReader();
+        reader.onload = () => {
+          // For now, just show a success message
+          // In a real app, you would upload the file to a server
+          setMessage({
+            type: "success",
+            text: "Photo uploaded successfully! (Feature in development)",
+          });
+        };
+        reader.onerror = () => {
+          setMessage({
+            type: "error",
+            text: "Error reading file. Please try a different image.",
+          });
+        };
+        reader.readAsDataURL(file);
       }
     };
     input.click();
@@ -181,7 +210,7 @@ export function UserSettings({ onBack }: UserSettingsProps) {
             {/* Avatar Section */}
             <div className="flex items-center space-x-4">
               <Avatar className="h-20 w-20 border-2 border-gray-200 dark:border-gray-700">
-                <AvatarFallback className="bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 text-xl font-medium">
+                <AvatarFallback className="bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-100 text-xl font-medium">
                   {user?.displayName?.charAt(0).toUpperCase() ||
                     user?.email?.charAt(0).toUpperCase() ||
                     "U"}

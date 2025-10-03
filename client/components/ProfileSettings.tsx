@@ -106,12 +106,27 @@ export default function ProfileSettings({ onBack }: ProfileSettingsProps) {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
         setPreviewImage(result);
         setFormData(prev => ({ ...prev, profilePhoto: result }));
+      };
+      reader.onerror = () => {
+        alert('Error reading file. Please try a different image.');
       };
       reader.readAsDataURL(file);
     }
